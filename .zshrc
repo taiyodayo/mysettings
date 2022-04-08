@@ -37,9 +37,10 @@ POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true
 # Easier to handle ssh etc
 export LANG=en_US.UTF-8
 
-
 # coatools @taiyodayo
-source ~/coatools/coa_funcs.sh >/dev/null
+if [ -f ~/.mailab/coatools/coatools.sh ]; then
+    source ~/.mailab/coatools/coatools.sh
+fi
 
 # mai研究室用スクリプト
 export docker_host=$(hostname)
