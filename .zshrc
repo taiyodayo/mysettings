@@ -1,0 +1,51 @@
+SAVEHIST=1000
+HISTFILE=~/.zsh_history
+
+# Zinit install will fail if there is git is not installed (ubuntu-desktop default etc). Installing git if not found.
+# MacOS with Xcode should have git installed by default, but will try if apt fails.
+which git > /dev/null || (echo "installing git" && sudo apt-get install git || brew install git)
+### Added by Zinit's installer
+if [[ ! -f $HOME/.zinit/bin/zinit.zsh ]]; then
+    print -P "%F{33}▓▒░ %F{220}Installing %F{33}DHARMA%F{220} Initiative Plugin Manager (%F{33}zdharma/zinit%F{220})…%f"
+    command mkdir -p "$HOME/.zinit" && command chmod g-rwX "$HOME/.zinit"
+    command git clone https://github.com/zdharma-continuum/zinit "$HOME/.zinit/bin" && \
+        print -P "%F{33}▓▒░ %F{34}Installation successful.%f%b" || \
+        print -P "%F{160}▓▒░ The clone has failed.%f%b"
+fi
+source "$HOME/.zinit/bin/zinit.zsh"
+autoload -Uz _zinit
+(( ${+_comps} )) && _comps[zinit]=_zinit
+# Load a few important annexes, without Turbo
+# (this is currently required for annexes)
+zinit light-mode for \
+    zdharma-continuum/z-a-rust \
+    zdharma-continuum/z-a-as-monitor \
+    zdharma-continuum/z-a-patch-dl \
+    zdharma-continuum/z-a-bin-gem-node
+### End of Zinit's installer chunk
+# Two regular plugins loaded without tracking.
+zinit light zsh-users/zsh-autosuggestions
+zinit light zdharma-continuum/fast-syntax-highlighting
+zplugin ice depth=1; zplugin light romkatv/powerlevel10k
+
+# To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
+[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true
+
+# シェル上で日本語化けるの対策。 # sshでlinuxリモートで化ける時は、iterm2 から locale variable を送信しないように変更
+# export LANG=ja_JP.UTF-8
+# Easier to handle ssh etc
+export LANG=en_US.UTF-8
+
+
+# coatools @taiyodayo
+source ~/coatools/coa_funcs.sh >/dev/null
+
+# mai研究室用スクリプト
+export docker_host=$(hostname)
+setopt extended_glob
+
+# マシン別の設定ファイルをソース
+if [ -f ~/.zlocal ]; then
+  source ~/.zlocal
+fi
