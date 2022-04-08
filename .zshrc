@@ -1,5 +1,7 @@
-SAVEHIST=1000
 HISTFILE=~/.zsh_history
+SAVEHIST=1000
+HISTSIZE=1000
+setopt appendhistory
 
 # Zinit install will fail if there is git is not installed (ubuntu-desktop default etc). Installing git if not found.
 # MacOS with Xcode should have git installed by default, but will try if apt fails.
@@ -50,3 +52,12 @@ setopt extended_glob
 if [ -f ~/.zlocal ]; then
   source ~/.zlocal
 fi
+
+## Colorize the ls output ##
+alias ls='ls --color=auto'
+
+# 実行ユーザの uid/gid でコンテナを実行
+export local_uid=$(id -u)
+export local_gid=$(id -g)
+export docker_host=$(hostname)
+export MAI_DEBUG="rstudio_gui"
