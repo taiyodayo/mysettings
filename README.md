@@ -6,7 +6,7 @@ just a repo to setup my linux boxes. nothing special here
 # run it like this
 git clone git@github.com:taiyodayo/mysettings.git && \
     cd mysettings && \
-    ./setup_zsh_and_keys.sh && \
-    cd .. && \
-    rm -rf mysettings
+    ./setup_zsh_and_keys.sh
+    # cd .. && \
+    # rm -rf mysettings
 ```

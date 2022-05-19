@@ -1,0 +1,8 @@
+font-fira-code-nerd-font
+font-noto-sans-cjk
+font-source-code-pro
+font-source-sans-pro
+temurin
+visual-studio-code
+wireshark
+android-studio

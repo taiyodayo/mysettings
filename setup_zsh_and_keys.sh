@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 cp ~/.zshrc ~/.zshrc.bak
-cp .zshrc ~/
+cp _zshrc ~/.zshrc
 cp ~/.p10k.zsh ~/.p10k.zsh.bak
-cp .p10k.zsh ~/
+cp _p10k.zsh ~/.p10k.zsh
 
 # copy pub key
 mkdir -p ~/.ssh/
