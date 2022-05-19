@@ -3,6 +3,6 @@ font-noto-sans-cjk
 font-source-code-pro
 font-source-sans-pro
 temurin
-visual-studio-code
 wireshark
+visual-studio-code
 android-studio

@@ -24,15 +24,11 @@ iftop
 ilmbase
 imagemagick
 jq
-librdkafka
 libuv
 little-cms
 llvm
 mtr
 mupdf
-neofetch
-neurobin/pkg/jpcre2
-neurobin/pkg/rnm
 nodebrew
 nvm
 oath-toolkit
