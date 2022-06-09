@@ -53,3 +53,4 @@ unar
 watch
 wget
 zlib
+svn
