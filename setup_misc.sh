@@ -7,10 +7,9 @@ fi
 
 brew tap homebrew/cask-fonts
 brew tap homebrew/cask-versions
-brew tap homebrew/cask-drivers
 
 cat brew_list.txt | xargs brew install
-cat brwe_cask.txt | xargs brew install --cask
+cat brew_cask.txt | xargs brew install --cask
 
 
 # setup sdkman for java

@@ -1,7 +1,7 @@
 font-fira-code-nerd-font
 font-noto-sans-cjk
 font-source-code-pro
-font-source-sans-pro
+font-source-sans-3
 temurin
 wireshark
 visual-studio-code
