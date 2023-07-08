@@ -4,5 +4,15 @@ font-source-code-pro
 font-source-sans-3
 temurin
 wireshark
+cyberduck
+mountain-duck
+sublime-text
+slack
+onyx
+discord
+google-chrome
+keka
+github
+vnc-viewer
 visual-studio-code
 android-studio
