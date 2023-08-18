@@ -74,11 +74,14 @@ t=$(mktemp) && \
   sudo bash "$t" && \
   rm "$t"
 
-
 # nvm
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.4/install.sh | bash
 source "${HOME}/.zshrc"
 nvm use 20
+
+# git のデフォルト
+git config --global user.name "taiyo@$(hostname) default"
+git config --global user.email "taiyodayo@gmail.com"
 
 # 最後の通知
 echo "Kitting completed. please logout to activate changes"
