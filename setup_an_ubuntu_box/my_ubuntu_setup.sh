@@ -63,11 +63,21 @@ sudo Rscript -e 'pacman::p_load(tidyverse, lubridate, stringr)'
 # misc/datatools でよく使うパッケージ
 # homebrew - ghostscript9, imagemagick7 via imei
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-brew intall -y gcc
-brew install -y ghostscript@9 imagemagick@7
+(echo; echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"') >> /home/taiyo/.zprofile
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+brew intall gcc
+# gs 10はPDF処理にバグがあって使用できない！！ (使うと日本語文字が散発的に化ける) gs9.55を指定してインストール
+sudo apt install ghostscript=9.55.0~dfsg1-0ubuntu5.4 qpdf mupdf
+# gs9.55 を使用するため、ソースからIM7をビルド
+t=$(mktemp) && \
+  wget 'https://dist.1-2.dev/imei.sh' -qO "$t" && \
+  sudo bash "$t" && \
+  rm "$t"
+
 
 # nvm
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.4/install.sh | bash
+source "${HOME}/.zshrc"
 nvm use 20
 
 # 最後の通知
