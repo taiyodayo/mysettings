@@ -15,7 +15,7 @@ fi
 
 # apt - 全体でよく使うパッケージ
 sudo apt install -y zsh avahi-daemon parallel wireguard-tools openresolv \
-   iftop iotop rclone
+   nkf iftop iotop rclone
 
 # カーネルパラメータを調整 - これしないとビッグデータ・webスクレープ系のワークロードが不安定になることがある
 echo "vm.swappiness=10" | sudo tee -a /etc/sysctl.conf
@@ -78,6 +78,13 @@ t=$(mktemp) && \
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.4/install.sh | bash
 source "${HOME}/.zshrc"
 nvm use 20
+
+# netdata
+wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && \
+  sh /tmp/netdata-kickstart.sh --stable-channel \
+    --claim-token xzdZDjRWCEdPau82Yt8xmcrvddTA01uUY4DLPpfQRDEbuGJJLMMhn8vG7uf3GmA4GLbr1Ce8dXyqyLHufGaZFHY72p1QAP3lm8ehJ_konTWhcgtlqB2bqhkGfhl5jK-eQl14Xb8 \
+    --claim-rooms 897e56af-6d74-438a-888f-12c38a879e7f \
+    --claim-url https://app.netdata.cloud
 
 # git のデフォルト
 git config --global user.name "taiyo@$(hostname) default"
