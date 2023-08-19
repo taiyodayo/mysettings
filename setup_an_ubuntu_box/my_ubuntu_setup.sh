@@ -42,7 +42,7 @@ sudo apt install -y docker-compose
 sudo usermod -aG docker "${USER}"
 # デフォルトのインセキュアレジストリを追加
 if [ ! -f /etc/docker/daemon.json ]; then
-  echo '{"insecure-registries" : ["rx-7.local:5000", "7.mai:5000"]}' > sudo tee /etc/docker/daemon.json
+  echo '{"insecure-registries" : ["rx-7.local:5000", "7.mai:5000"]}' | sudo tee /etc/docker/daemon.json
 fi
 sudo systemctl restart docker
 
