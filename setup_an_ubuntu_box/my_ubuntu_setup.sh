@@ -58,7 +58,7 @@ sudo apt install -y libharfbuzz-dev libfribidi-dev libfreetype6-dev libpng-dev l
   libxml2-dev libcurl4-openssl-dev libfontconfig1-dev libssl-dev libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev libxml2-dev
 # 多用するパッケージはsudo で全ユーザ向けにインストールしておく
 sudo Rscript -e 'install.packages("pacman")'
-sudo Rscript -e 'pacman::p_load(tidyverse, lubridate, stringr, languageserver)'
+sudo Rscript -e 'pacman::p_load(tidyverse, lubridate, stringr, languageserver, httpgd)'
 
 # misc/datatools でよく使うパッケージ
 # homebrew - ghostscript9, imagemagick7 via imei
