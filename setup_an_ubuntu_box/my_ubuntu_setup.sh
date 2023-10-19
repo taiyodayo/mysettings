@@ -55,7 +55,7 @@ sudo apt update
 sudo apt install -y r-base
 # tidyverseのビルドに必要なパッケージを追加
 sudo apt install -y libharfbuzz-dev libfribidi-dev libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev \
-  libxml2-dev libcurl4-openssl-dev libfontconfig1-dev libssl-dev libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev libxml2-dev
+  libxml2-dev libcurl4-openssl-dev libfontconfig1-dev libssl-dev libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev libxml2-dev libcairo2-dev
 # 多用するパッケージはsudo で全ユーザ向けにインストールしておく
 sudo Rscript -e 'install.packages("pacman")'
 sudo Rscript -e 'pacman::p_load(tidyverse, lubridate, stringr, languageserver, httpgd)'
