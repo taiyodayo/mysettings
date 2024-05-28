@@ -49,5 +49,3 @@ unar
 watch
 wget
 zlib
-fvm
-
