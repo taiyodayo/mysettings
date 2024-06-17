@@ -33,7 +33,7 @@ if [ "$(uname)" = "Darwin" ] && [ "$(uname -p)" = "i386" ]; then
 fi
 
 # Flutter で cocoapods が必要 ruby は rbenv 使う！ rvm はトラブルだらけ
-brwe install rbenv
+brew install rbenv
 rbenv init
 rbenv install 3.3.1
 rbenv global 3.3.1
