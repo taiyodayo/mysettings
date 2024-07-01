@@ -21,11 +21,12 @@ echo "vm.swappiness=10" | sudo tee -a /etc/sysctl.conf
 sudo sysctl -p
 
 # zsh のデフォルトを github から
-wget -O ~/.zshrc https://raw.githubusercontent.com/taiyodayo/mysettings/main/_zshrc 
-wget -O ~/.p10k.zsh https://raw.githubusercontent.com/taiyodayo/mysettings/main/_p10k.zsh
+# このあたりは taiyo 権限で実行する必要がある
+sudo -u taiyo wget -O ~/.zshrc https://raw.githubusercontent.com/taiyodayo/mysettings/main/_zshrc 
+sudo -u taiyo wget -O ~/.p10k.zsh https://raw.githubusercontent.com/taiyodayo/mysettings/main/_p10k.zsh
 # バックグラウンドに投げて zinit の初期化を済ませておく
-zsh &
-chsh -s /usr/bin/zsh
+sudo -u taiyo zsh &
+sudo -u taiyo chsh -s /usr/bin/zsh
 
 # docker-ce の部
 sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
