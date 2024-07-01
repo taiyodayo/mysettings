@@ -39,10 +39,16 @@ sudo apt install -y docker-ce
 sudo apt install -y docker-compose
 # ユーザを docker グループに追加
 sudo usermod -aG docker "${USER}"
-# デフォルトのインセキュアレジストリを追加
-if [ ! -f /etc/docker/daemon.json ]; then
-  echo '{"insecure-registries" : ["rx-7.local:5000", "7.mai:5000"]}' | sudo tee /etc/docker/daemon.json
-fi
+# # デフォルトのインセキュアレジストリを追加
+# if [ ! -f /etc/docker/daemon.json ]; then
+#   echo '{"insecure-registries" : ["rx-7.local:5000", "7.mai:5000"]}' | sudo tee /etc/docker/daemon.json
+# fi
+# boomer.local / boomer.mai は ssl を使用するようになった。
+# 必要なルート証明書をコピー
+sudo cp ~/mysettings/setup_an_ubuntu_box/certs/mailab_root_ca.crt /usr/local/share/ca-certificates
+# 証明書を更新
+sudo update-ca-certificates
+# docker をリスタート
 sudo systemctl restart docker
 
 # R の部
