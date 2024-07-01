@@ -14,8 +14,7 @@ else
 fi
 
 # apt - 全体でよく使うパッケージ
-sudo apt install -y zsh avahi-daemon parallel wireguard-tools openresolv \
-   nkf iftop iotop rclone
+sudo apt install -y zsh avahi-daemon parallel wireguard-tools nkf iftop iotop rclone
 
 # カーネルパラメータを調整 - これしないとビッグデータ・webスクレープ系のワークロードが不安定になることがある
 echo "vm.swappiness=10" | sudo tee -a /etc/sysctl.conf
