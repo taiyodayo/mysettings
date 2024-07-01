@@ -19,19 +19,11 @@ else
 fi
 
 # apt - 全体でよく使うパッケージ
-apt install -y zsh avahi-daemon parallel wireguard-tools nkf iftop iotop rclone
+apt-get install -y zsh avahi-daemon parallel wireguard-tools nkf iftop iotop rclone
 
 # カーネルパラメータを調整 - これしないとビッグデータ・webスクレープ系のワークロードが不安定になることがある
 echo "vm.swappiness=10" | tee -a /etc/sysctl.conf
 sysctl -p
-
-# zsh のデフォルトを github から
-# このあたりは taiyo 権限で実行する必要がある
-sudo -u taiyo wget -O ~/.zshrc https://raw.githubusercontent.com/taiyodayo/mysettings/main/_zshrc 
-sudo -u taiyo wget -O ~/.p10k.zsh https://raw.githubusercontent.com/taiyodayo/mysettings/main/_p10k.zsh
-# バックグラウンドに投げて zinit の初期化を済ませておく
-sudo -u taiyo zsh &
-sudo -u taiyo chsh -s /usr/bin/zsh
 
 # docker-ce の部
 apt-get install -y apt-transport-https ca-certificates curl software-properties-common
@@ -42,9 +34,9 @@ apt-cache policy docker-ce
 apt-get install -y docker-ce
 # sudo systemctl status docker
 # docker-compose を使わないと mailab のコンテナと互換性が無いのに注意 `docker compose` への対応は先送り中
-apt install -y docker-compose
+apt-get install -y docker-compose
 # ユーザを docker グループに追加
-usermod -aG docker "${USER}"
+usermod -aG docker "${SUDO_USER}"
 # # デフォルトのインセキュアレジストリを追加
 # if [ ! -f /etc/docker/daemon.json ]; then
 #   echo '{"insecure-registries" : ["rx-7.local:5000", "7.mai:5000"]}' | sudo tee /etc/docker/daemon.json
@@ -73,10 +65,10 @@ wget -qO- https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc | tee
 # add the R 4.0 repo from CRAN -- adjust 'focal' to 'groovy' or 'bionic' as needed
 add-apt-repository "deb https://cloud.r-project.org/bin/linux/ubuntu $(lsb_release -cs)-cran40/"
 # インストール
-apt update
-apt install -y r-base
+apt-get update
+apt-get install -y r-base
 # tidyverseのビルドに必要なパッケージを追加
-apt install -y libharfbuzz-dev libfribidi-dev libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev \
+apt-get install -y libharfbuzz-dev libfribidi-dev libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev \
   libxml2-dev libcurl4-openssl-dev libfontconfig1-dev libssl-dev libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev libxml2-dev libcairo2-dev
 # 多用するパッケージはsudo で全ユーザ向けにインストールしておく
 Rscript -e 'install.packages("pacman")'
@@ -89,18 +81,31 @@ Rscript -e 'pacman::p_load(tidyverse, lubridate, stringr, languageserver, httpgd
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 sudo -u taiyo brew intall gcc
 # gs 10はPDF処理にバグがあって使用できない！！ (使うと日本語文字が散発的に化ける) gs9.55を指定してインストール
-apt install ghostscript=9.55.0~dfsg1-0ubuntu5.4 qpdf mupdf
+apt-get install ghostscript=9.55.0~dfsg1-0ubuntu5.4 qpdf mupdf
 # gs9.55 を使用するため、ソースからIM7をビルド
 t=$(mktemp) && \
   wget 'https://dist.1-2.dev/imei.sh' -qO "$t" && \
-  sudo bash "$t" && \
+  bash "$t" && \
   rm "$t"
 
+
+### ここからユーザランド ###
+# here-document としてコマンドを列記
+sudo -u $SUDO_USER bash << EOF
+echo "Running as $SUDO_USER"
+
+# zsh のデフォルトを github から
+wget -O ~/.zshrc https://raw.githubusercontent.com/taiyodayo/mysettings/main/_zshrc 
+wget -O ~/.p10k.zsh https://raw.githubusercontent.com/taiyodayo/mysettings/main/_p10k.zsh
+# バックグラウンドに投げて zinit の初期化を済ませておく
+zsh &
+chsh -s /usr/bin/zsh
+
 # nvm
-sudo -u taiyo curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-source "${HOME}/.zshrc"
-sudo -u taiyo nvm install 22
-sudo -u taiyo nvm use 22
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+source "/home/${SUDO_USER}/.zshrc"
+nvm install 22
+nvm use 22
 
 # netdata
 sudo -u taiyo wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && \
@@ -110,9 +115,13 @@ sudo -u taiyo wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.
     --claim-url https://app.netdata.cloud
 
 # git のデフォルト
-sudo -u git config --global user.name "taiyo@$(hostname) default"
-sudo -u git config --global user.email "taiyodayo@gmail.com"
+git config --global user.name "taiyo@$(hostname) default"
+git config --global user.email "taiyodayo@gmail.com"
 
+# taiyo 実行ここまで
+EOF
+
+echo "Running as root"
 # 最後の通知
 echo "Kitting completed. please logout to activate changes"
 #[EOF]
