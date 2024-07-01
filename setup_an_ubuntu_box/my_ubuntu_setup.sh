@@ -91,9 +91,10 @@ t=$(mktemp) && \
   rm "$t"
 
 # nvm
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.4/install.sh | bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
 source "${HOME}/.zshrc"
-nvm use 20
+nvm install 22
+nvm use 22
 
 # netdata
 wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && \
