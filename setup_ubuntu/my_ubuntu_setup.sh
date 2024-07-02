@@ -56,7 +56,7 @@ apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E084DAB9
 # update indices
 apt update -qq
 # install two helper packages we need
-apt install --no-install-recommends software-properties-common dirmngr
+apt install -y --no-install-recommends software-properties-common dirmngr
 # add the signing key (by Michael Rutter) for these repos
 # To verify key, run gpg --show-keys /etc/apt/trusted.gpg.d/cran_ubuntu_key.asc 
 # Fingerprint: E298A3A825C0D65DFD57CBB651716619E084DAB9
@@ -81,7 +81,7 @@ Rscript -e 'pacman::p_load(tidyverse, lubridate, stringr, languageserver, httpgd
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 sudo -u taiyo brew intall gcc
 # gs 10はPDF処理にバグがあって使用できない！！ (使うと日本語文字が散発的に化ける) gs9.55を指定してインストール
-apt-get install ghostscript=9.55.0~dfsg1-0ubuntu5.4 qpdf mupdf
+apt-get install -y ghostscript=9.55.0~dfsg1-0ubuntu5.4 qpdf mupdf
 # gs9.55 を使用するため、ソースからIM7をビルド
 t=$(mktemp) && \
   wget 'https://dist.1-2.dev/imei.sh' -qO "$t" && \
