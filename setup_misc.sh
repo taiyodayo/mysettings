@@ -32,8 +32,8 @@ fi
 # Flutter で cocoapods が必要 ruby は rbenv 使う！ rvm はトラブルだらけ
 brew install rbenv
 rbenv init
-rbenv install 3.3.1
-rbenv global 3.3.1
+rbenv install 3.3.3
+rbenv global 3.3.3
 sudo gem install cocoapods
 
 # メモを表示
