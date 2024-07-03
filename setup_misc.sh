@@ -8,9 +8,10 @@ fi
 cat brew_list.txt | xargs brew install
 cat brew_cask.txt | xargs brew install --cask
 
+# java使わんからなぁ
 # setup sdkman for java
-echo "setup sdkman for java:"
-curl -s "https://get.sdkman.io" | bash && source "${HOME}/.sdkman/bin/sdkman-init.sh" && sdk install java
+# echo "setup sdkman for java:"
+# curl -s "https://get.sdkman.io" | bash && source "${HOME}/.sdkman/bin/sdkman-init.sh" && sdk install java
 
 # miniconda
 echo "Setting up miniconda"
@@ -32,11 +33,14 @@ fi
 # Flutter で cocoapods が必要 ruby は rbenv 使う！ rvm はトラブルだらけ
 brew install rbenv
 rbenv init
-rbenv install 3.3.3
+eval "$(rbenv init - zsh)"
+rbenv insstall 3.3.3
 rbenv global 3.3.3
 sudo gem install cocoapods
 
 # メモを表示
+echo "brew packages installed."
+
 echo "XcodeはAppStore経由だと不安定な事が多いです。Apple Developerから直接ダウンロードを推奨します"
 echo "https://developer.apple.com/download/more/"
 echo ""
