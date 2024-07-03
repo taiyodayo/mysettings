@@ -63,3 +63,6 @@ export local_uid=$(id -u)
 export local_gid=$(id -g)
 export docker_host=$(hostname)
 export MAI_DEBUG="rstudio_gui"
+
+git config --global user.name "taiyo@$(hostname) default"
+git config --global user.email "taiyodayo@gmail.com"
