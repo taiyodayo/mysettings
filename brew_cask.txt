@@ -2,6 +2,7 @@ font-fira-code-nerd-font
 font-noto-sans-cjk
 font-source-code-pro
 font-source-sans-3
+iterm2
 temurin
 wireshark
 cyberduck
