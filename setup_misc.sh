@@ -5,9 +5,6 @@ if [ "$(uname)" = "Darwin" ] && [ ! -f /usr/local/bin/brew ]; then
     /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
 fi
 
-brew tap homebrew/cask-fonts
-brew tap homebrew/cask-versions
-
 cat brew_list.txt | xargs brew install
 cat brew_cask.txt | xargs brew install --cask
 
