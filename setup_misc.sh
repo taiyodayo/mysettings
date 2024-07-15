@@ -34,7 +34,7 @@ fi
 brew install rbenv
 rbenv init
 eval "$(rbenv init - zsh)"
-rbenv insstall 3.3.3
+rbenv install 3.3.3
 rbenv global 3.3.3
 sudo gem install cocoapods
 
