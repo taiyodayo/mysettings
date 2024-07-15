@@ -49,6 +49,10 @@ update-ca-certificates
 # docker をリスタート
 systemctl restart docker
 
+# netdata
+# aptでいれるのが一番早い。war roomへのノード追加はライセンス移行により辞めたほうが良くなった。
+apt-get install -y netdata
+
 # R の部
 # ubuntu に tidyverse で必要なパッケージ
 # キーを追加
@@ -107,16 +111,16 @@ source "/home/${SUDO_USER}/.zshrc"
 nvm install 22
 nvm use 22
 
-# netdata
-sudo -u taiyo wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && \
-  sh /tmp/netdata-kickstart.sh --stable-channel \
-    --claim-token xzdZDjRWCEdPau82Yt8xmcrvddTA01uUY4DLPpfQRDEbuGJJLMMhn8vG7uf3GmA4GLbr1Ce8dXyqyLHufGaZFHY72p1QAP3lm8ehJ_konTWhcgtlqB2bqhkGfhl5jK-eQl14Xb8 \
-    --claim-rooms 897e56af-6d74-438a-888f-12c38a879e7f \
-    --claim-url https://app.netdata.cloud
-
 # git のデフォルト
 git config --global user.name "taiyo@$(hostname) default"
 git config --global user.email "taiyodayo@gmail.com"
+
+# netdata
+#wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && \
+#  sh /tmp/netdata-kickstart.sh --stable-channel \
+#    --claim-token xzdZDjRWCEdPau82Yt8xmcrvddTA01uUY4DLPpfQRDEbuGJJLMMhn8vG7uf3GmA4GLbr1Ce8dXyqyLHufGaZFHY72p1QAP3lm8ehJ_konTWhcgtlqB2bqhkGfhl5jK-eQl14Xb8 \
+#    --claim-rooms 897e56af-6d74-438a-888f-12c38a879e7f \
+#    --claim-url https://app.netdata.cloud
 
 # taiyo 実行ここまで
 EOF
