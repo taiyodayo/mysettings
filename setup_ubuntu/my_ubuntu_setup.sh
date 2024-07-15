@@ -43,7 +43,7 @@ usermod -aG docker "${SUDO_USER}"
 # fi
 # boomer.local / boomer.mai は ssl を使用するようになった。
 # 必要なルート証明書をコピー
-cp "/home/${SUDO_USER}/mysettings/setup_an_ubuntu_box/certs/mailab_root_ca.crt" /usr/local/share/ca-certificates
+cp "/home/${SUDO_USER}/mysettings/setup_ubuntu/certs/mailab_root_ca.crt" /usr/local/share/ca-certificates
 # 証明書を更新
 update-ca-certificates
 # docker をリスタート
