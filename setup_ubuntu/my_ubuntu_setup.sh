@@ -19,7 +19,7 @@ else
 fi
 
 # apt - 全体でよく使うパッケージ
-apt-get install -y zsh avahi-daemon parallel wireguard-tools nkf iftop iotop rclone
+apt-get install -y zsh avahi-daemon parallel wireguard-tools nkf iftop iotop rclone lm-sensors
 
 # カーネルパラメータを調整 - これしないとビッグデータ・webスクレープ系のワークロードが不安定になることがある
 echo "vm.swappiness=10" | tee -a /etc/sysctl.conf
