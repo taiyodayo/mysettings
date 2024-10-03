@@ -34,7 +34,6 @@ pigz
 poppler
 pstree
 qpdf
-r
 rbenv
 rclone
 rename
