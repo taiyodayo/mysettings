@@ -51,4 +51,4 @@ echo ""
 
 echo "Flutter は brew で入れると階層が深くなるので、手動でunzipしてインストールを"
 echo "https://docs.flutter.dev/get-started/install/macos"
-echo 'export PATH="$PATH:${HOME}/flutter/bin"' >>~/.zshrc
+echo 'export PATH="$PATH:${HOME}/flutter/bin"' >> ~/.zshrc
