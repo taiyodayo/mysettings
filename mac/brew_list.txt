@@ -14,7 +14,6 @@ gnu-sed
 gnu-tar
 graphicsmagick
 grep
-gromgit/fuse/sshfs-mac
 hdf5
 hexyl
 htop

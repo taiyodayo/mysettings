@@ -8,7 +8,6 @@ wireshark
 cyberduck
 mountain-duck
 sublime-text
-slack
 onyx
 discord
 google-chrome

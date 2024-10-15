@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ubuntu サーバを共通でセットアップします
 if [[ $EUID -ne 0 ]]; then
-   echo "This script must be run as root" 
+   echo "This script must be run as root"
    exit 1
 fi
 
@@ -43,7 +43,7 @@ usermod -aG docker "${SUDO_USER}"
 # fi
 # boomer.local / boomer.mai は ssl を使用するようになった。
 # 必要なルート証明書をコピー
-cp "/home/${SUDO_USER}/mysettings/setup_ubuntu/certs/mailab_root_ca.crt" /usr/local/share/ca-certificates
+cp "/home/${SUDO_USER}/mysettings/certs/mailab_root_ca.crt" /usr/local/share/ca-certificates
 # 証明書を更新
 update-ca-certificates
 # docker をリスタート
@@ -62,7 +62,7 @@ apt update -qq
 # install two helper packages we need
 apt install -y --no-install-recommends software-properties-common dirmngr
 # add the signing key (by Michael Rutter) for these repos
-# To verify key, run gpg --show-keys /etc/apt/trusted.gpg.d/cran_ubuntu_key.asc 
+# To verify key, run gpg --show-keys /etc/apt/trusted.gpg.d/cran_ubuntu_key.asc
 # Fingerprint: E298A3A825C0D65DFD57CBB651716619E084DAB9
 # cran の apt レポを追加
 wget -qO- https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc | tee -a /etc/apt/trusted.gpg.d/cran_ubuntu_key.asc
@@ -95,11 +95,11 @@ t=$(mktemp) && \
 
 ### ここからユーザランド ###
 # here-document としてコマンドを列記
-sudo -u $SUDO_USER bash << EOF
+sudo -u "$SUDO_USER" bash << EOF
 echo "Running as $SUDO_USER"
 
 # zsh のデフォルトを github から
-wget -O ~/.zshrc https://raw.githubusercontent.com/taiyodayo/mysettings/main/_zshrc 
+wget -O ~/.zshrc https://raw.githubusercontent.com/taiyodayo/mysettings/main/_zshrc
 wget -O ~/.p10k.zsh https://raw.githubusercontent.com/taiyodayo/mysettings/main/_p10k.zsh
 # バックグラウンドに投げて zinit の初期化を済ませておく
 zsh &
