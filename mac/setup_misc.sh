@@ -66,6 +66,14 @@ rbenv install 3.3.5
 rbenv global 3.3.5
 sudo gem install cocoapods
 
+# NVM で nodejs を管理
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+nvm install --lts
+nvm use --lts
+
 # メモを表示
 echo "brew packages installed."
 
