@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 # setup brew for macs
 if [ "$(uname)" = "Darwin" ] && [ ! -f /usr/local/bin/brew ]; then
@@ -29,6 +30,33 @@ if [ "$(uname)" = "Darwin" ] && [ "$(uname -p)" = "i386" ]; then
     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh
     bash Miniconda3-latest-MacOSX-x86_64.sh
 fi
+
+
+# Flutter Global
+# ARM64
+if [ "$(uname)" = "Darwin" ] && [ "$(uname -p)" = "arm64" ]; then
+    curl -O https://storage.googleapis.com/flutter_infra_release/releases/stable/macos/flutter_macos_arm64_3.24.3-stable.zip
+    unzip ~/flutter_macos_arm64_3.24.3-stable.zip \
+       -d ~/
+fi
+# Intel
+if [ "$(uname)" = "Darwin" ] && [ "$(uname -p)" = "i386" ]; then
+    curl -O https://storage.googleapis.com/flutter_infra_release/releases/stable/macos/flutter_macos_3.24.3-stable.zip
+    unzip ~/flutter_macos_3.24.3-stable.zip \
+       -d ~/
+fi
+# Start a subshell - upgrade flutter to latest stable
+(
+    # Change directory to ~/flutter or exit if it fails
+    cd ~/flutter || exit 1
+    # Run Flutter commands
+    flutter channel stable
+    flutter upgrade
+) # End of subshell
+
+# Flutter FVM
+brew tap leoafarias/fvm
+brew install fvm
 
 # Flutter で cocoapods が必要 ruby は rbenv 使う！ rvm はトラブルだらけ
 brew install rbenv
