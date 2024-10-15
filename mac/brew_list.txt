@@ -32,6 +32,7 @@ pdftk-java
 pigz
 poppler
 pstree
+pyenv
 qpdf
 rbenv
 rclone
