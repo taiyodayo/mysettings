@@ -1,8 +1,25 @@
 #!/usr/bin/env bash
-cp ~/.zshrc ~/.zshrc.bak
+#!/bin/bash
+
+# Backup .zshrc if it exists
+if [ -f ~/.zshrc ]; then
+    cp ~/.zshrc ~/.zshrc.bak
+    echo "Backed up existing .zshrc"
+fi
+
+# Copy new .zshrc
 cp -f _zshrc ~/.zshrc
-cp ~/.p10k.zsh ~/.p10k.zsh.bak
+echo "Copied new .zshrc"
+
+# Backup .p10k.zsh if it exists
+if [ -f ~/.p10k.zsh ]; then
+    cp ~/.p10k.zsh ~/.p10k.zsh.bak
+    echo "Backed up existing .p10k.zsh"
+fi
+
+# Copy new .p10k.zsh
 cp -f _p10k.zsh ~/.p10k.zsh
+echo "Copied new .p10k.zsh"
 
 # copy pub key
 mkdir -p ~/.ssh/

@@ -3,11 +3,11 @@ set -euo pipefail
 
 # setup brew for macs
 if [ "$(uname)" = "Darwin" ] && [ ! -f /usr/local/bin/brew ]; then
-    /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 fi
 
-cat brew_list.txt | xargs brew install
-cat brew_cask.txt | xargs brew install --cask
+cat "$SCRIPT_DIR/mac/brew_list.txt" | xargs brew install
+cat "$SCRIPT_DIR/mac/brew_cask.txt" | xargs brew install --cask
 
 # java使わんからなぁ
 # setup sdkman for java
