@@ -5,7 +5,6 @@ bash
 bat
 coreutils
 epubcheck
-exa
 findutils
 gh
 git
@@ -22,7 +21,7 @@ ilmbase
 imagemagick
 jq
 libuv
-little-cms
+little-cms2
 llvm
 mtr
 mupdf
