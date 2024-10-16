@@ -31,19 +31,18 @@ if [ "$(uname)" = "Darwin" ] && [ "$(uname -p)" = "i386" ]; then
     bash Miniconda3-latest-MacOSX-x86_64.sh
 fi
 
-
 # Flutter Global
 # ARM64
 if [ "$(uname)" = "Darwin" ] && [ "$(uname -p)" = "arm64" ]; then
     curl -O https://storage.googleapis.com/flutter_infra_release/releases/stable/macos/flutter_macos_arm64_3.24.3-stable.zip
-    unzip ~/flutter_macos_arm64_3.24.3-stable.zip \
-       -d ~/
+    unzip flutter_macos_arm64_3.24.3-stable.zip \
+        -d ~/
 fi
 # Intel
 if [ "$(uname)" = "Darwin" ] && [ "$(uname -p)" = "i386" ]; then
     curl -O https://storage.googleapis.com/flutter_infra_release/releases/stable/macos/flutter_macos_3.24.3-stable.zip
-    unzip ~/flutter_macos_3.24.3-stable.zip \
-       -d ~/
+    unzip flutter_macos_3.24.3-stable.zip \
+        -d ~/
 fi
 # Start a subshell - upgrade flutter to latest stable
 (
@@ -70,8 +69,8 @@ sudo gem install cocoapods
 # NVM で nodejs を管理
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
 export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"                   # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion" # This loads nvm bash_completion
 nvm install --lts
 nvm use --lts
 
@@ -88,4 +87,4 @@ echo ""
 
 echo "Flutter は brew で入れると階層が深くなるので、手動でunzipしてインストールを"
 echo "https://docs.flutter.dev/get-started/install/macos"
-echo 'export PATH="$PATH:${HOME}/flutter/bin"' >> ~/.zshrc
+echo 'export PATH="$PATH:${HOME}/flutter/bin"' >>~/.zshrc
