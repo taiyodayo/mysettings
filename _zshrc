@@ -68,6 +68,7 @@ git config --global user.name "taiyo@$(hostname) default"
 git config --global user.email "taiyodayo@gmail.com"
 
 # rbenv の設定 - Mac でアプリ開発する場合のみ必要 一旦コメントアウト
+export PATH="$HOME/.rbenv/bin:$PATH"
 eval "$(rbenv init - zsh)"
 
 # ff = fvm flutter
