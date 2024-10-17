@@ -31,7 +31,6 @@ pdftk-java
 pigz
 poppler
 pstree
-pyenv
 qpdf
 rbenv
 rclone
@@ -44,6 +43,7 @@ tldr
 tmux
 tree
 unar
+uv
 watch
 wget
 zlib

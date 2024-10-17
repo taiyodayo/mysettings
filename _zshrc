@@ -67,13 +67,13 @@ export MAI_DEBUG="rstudio_gui"
 git config --global user.name "taiyo@$(hostname) default"
 git config --global user.email "taiyodayo@gmail.com"
 
-# rbenv の設定 - Mac でアプリ開発する場合のみ必要 一旦コメントアウト
+# rbenv の設定 - Mac でアプリ開発する場合のみ必要
 export PATH="$HOME/.rbenv/bin:$PATH"
 eval "$(rbenv init - zsh)"
 
 # ff = fvm flutter
 alias ff='fvm flutter'
-export PYENV_ROOT="$HOME/.pyenv"
-export PATH="$PYENV_ROOT/bin:$PATH"
-eval "$(pyenv init --path)"
-eval "$(pyenv init -)"
+
+# python / uv
+source p312/bin/activate
+

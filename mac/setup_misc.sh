@@ -74,6 +74,11 @@ export NVM_DIR="$HOME/.nvm"
 nvm install --lts
 nvm use --lts
 
+# システム python は uv で管理
+uv venv --python 3.12 p312
+source p312/bin/activate
+uv pip install polars pandas numpy requests
+
 # メモを表示
 echo "brew packages installed."
 
