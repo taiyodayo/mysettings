@@ -78,6 +78,8 @@ sudo gem install cocoapods
 # nodejs は voltaで管理
 brew install volta
 volta setup
+# このセッションでも使えるように
+export PATH="$HOME/.volta/bin:$PATH"
 # gatsby は node20 が必要
 volta install node@20
 
