@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# ここまでやると brew のウォーニングでも止まってしまう 一旦無視
+# set -euo pipefail
 
 # このスクリプトの保存pathを取得
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
