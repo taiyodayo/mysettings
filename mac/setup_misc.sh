@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+#set -euo pipefail
 
 # setup brew for macs
 if [ "$(uname)" = "Darwin" ] && [ ! -f /usr/local/bin/brew ]; then
