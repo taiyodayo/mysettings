@@ -73,7 +73,7 @@ eval "$(rbenv init - zsh)"
 
 # ff = fvm flutter
 alias ff='fvm flutter'
+export PATH="$HOME/flutter/bin:$PATH"
 
 # python / uv
 source p312/bin/activate
-

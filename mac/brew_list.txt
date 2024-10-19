@@ -32,7 +32,6 @@ pigz
 poppler
 pstree
 qpdf
-rbenv
 rclone
 rename
 ruby

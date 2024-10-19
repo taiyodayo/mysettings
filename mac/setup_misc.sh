@@ -58,12 +58,22 @@ brew tap leoafarias/fvm
 brew install fvm
 
 # Flutter で cocoapods が必要 ruby は rbenv 使う！ rvm はトラブルだらけ
-brew install rbenv
-rbenv init
-export PATH="$HOME/.rbenv/bin:$PATH"
-eval "$(rbenv init - zsh)"
-rbenv install 3.3.5
-rbenv global 3.3.5
+# brew install rbenv
+# rbenv init
+# export PATH="$HOME/.rbenv/bin:$PATH"
+# eval "$(rbenv init - zsh)"
+# rbenv install 3.3.5
+# rbenv global 3.3.5
+
+# Ruby - rbenv はインストールが遅い。homebrweの最新をそのまま使う
+# Apple Silicon
+if [ "$(uname)" = "Darwin" ] && [ "$(uname -p)" = "arm64" ]; then
+    echo 'export PATH="/opt/homebrew/opt/ruby/bin:$PATH"' >>~/.zshrc
+fi
+# Intel
+if [ "$(uname)" = "Darwin" ] && [ "$(uname -p)" = "i386" ]; then
+    echo 'export PATH="/usr/local/opt/ruby/bin:$PATH"' >>~/.zshrc
+fi
 sudo gem install cocoapods
 
 # NVMは遅い！！
@@ -81,7 +91,7 @@ volta setup
 # このセッションでも使えるように
 export PATH="$HOME/.volta/bin:$PATH"
 # gatsby は node20 が必要
-volta install node@20
+zsh -c "volta install node@20"
 
 # システム python は uv で管理
 uv venv --python 3.12 p312
