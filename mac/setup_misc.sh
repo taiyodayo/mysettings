@@ -97,7 +97,7 @@ zsh -c "volta install node@20"
 
 # システム python は uv で管理
 uv venv --python 3.12 p312
-source p312/bin/activate
+source $HOME/p312/bin/activate
 uv pip install polars pandas numpy requests
 
 # メモを表示
