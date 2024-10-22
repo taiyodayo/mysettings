@@ -66,18 +66,19 @@ rbenv install 3.3.5
 rbenv global 3.3.5
 sudo gem install cocoapods
 
-# Ruby - rbenv はインストールが遅い。homebrweの最新をそのまま使う
-# Apple Silicon
+# homebrew の ruby だと cocoapods が動かない
+# # Ruby - rbenv はインストールが遅い。homebrweの最新をそのまま使う
+# # Apple Silicon
 # if [ "$(uname)" = "Darwin" ] && [ "$(uname -p)" = "arm64" ]; then
-#    echo 'export PATH="/opt/homebrew/opt/ruby/bin:$PATH"' >>~/.zshrc
+#     echo 'export PATH="/opt/homebrew/opt/ruby/bin:$PATH"' >>~/.zshrc
 # fi
 # # Intel
 # if [ "$(uname)" = "Darwin" ] && [ "$(uname -p)" = "i386" ]; then
-#    echo 'export PATH="/usr/local/opt/ruby/bin:$PATH"' >>~/.zshrc
+#     echo 'export PATH="/usr/local/opt/ruby/bin:$PATH"' >>~/.zshrc
 # fi
 # sudo gem install cocoapods
 
-# NVMは遅い！！
+# NVMは遅い voltaに移行
 # # NVM で nodejs を管理
 # curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
 # export NVM_DIR="$HOME/.nvm"

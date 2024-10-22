@@ -34,7 +34,6 @@ pstree
 qpdf
 rclone
 rename
-ruby
 shellcheck
 subversion
 telnet
