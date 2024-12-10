@@ -8,7 +8,7 @@ brew install libgit2 libsodium libtiff cmake libxml2 openssl curl harfbuzz fribi
 brew install --cask r
 
 # デフォルトのレポを設定
-echo 'options(repos = c(CRAN = "https://ftp.yz.yamagata-u.ac.jp/pub/cran/"))' > ~/.Rprofile
+echo 'options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux__/jammy/latest"))' > ~/.Rprofile
 
 # 多用するパッケージはsudo で全ユーザ向けにインストールしておく
 Rscript -e 'install.packages("pacman")'
