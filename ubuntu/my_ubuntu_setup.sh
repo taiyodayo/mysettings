@@ -95,7 +95,7 @@ t=$(mktemp) && \
 
 ### ここからユーザランド ###
 # here-document としてコマンドを列記
-sudo -u "$SUDO_USER" bash << 'EOF'
+sudo -u "$SUDO_USER" zsh << 'EOF'
 echo "Running as $SUDO_USER"
 
 # これ、手前のスクリプトで実行済み
