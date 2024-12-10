@@ -95,15 +95,16 @@ t=$(mktemp) && \
 
 ### ここからユーザランド ###
 # here-document としてコマンドを列記
-sudo -u "$SUDO_USER" bash << EOF
+sudo -u "$SUDO_USER" bash << 'EOF'
 echo "Running as $SUDO_USER"
 
-# zsh のデフォルトを github から
-wget -O ~/.zshrc https://raw.githubusercontent.com/taiyodayo/mysettings/main/_zshrc
-wget -O ~/.p10k.zsh https://raw.githubusercontent.com/taiyodayo/mysettings/main/_p10k.zsh
-# バックグラウンドに投げて zinit の初期化を済ませておく
-zsh &
-chsh -s /usr/bin/zsh
+# これ、手前のスクリプトで実行済み
+# # zsh のデフォルトを github から
+# wget -O ~/.zshrc https://raw.githubusercontent.com/taiyodayo/mysettings/main/_zshrc
+# wget -O ~/.p10k.zsh https://raw.githubusercontent.com/taiyodayo/mysettings/main/_p10k.zsh
+# # バックグラウンドに投げて zinit の初期化を済ませておく
+# zsh &
+# chsh -s /usr/bin/zsh
 
 # nvm
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
