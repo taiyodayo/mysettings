@@ -98,17 +98,15 @@ t=$(mktemp) && \
 sudo -u "$SUDO_USER" zsh << 'EOF'
 echo "Running as $SUDO_USER"
 
-# これ、手前のスクリプトで実行済み
-# # zsh のデフォルトを github から
-# wget -O ~/.zshrc https://raw.githubusercontent.com/taiyodayo/mysettings/main/_zshrc
-# wget -O ~/.p10k.zsh https://raw.githubusercontent.com/taiyodayo/mysettings/main/_p10k.zsh
-# # バックグラウンドに投げて zinit の初期化を済ませておく
-# zsh &
-# chsh -s /usr/bin/zsh
+# ubuntu でも homebrew は便利
+NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
 # node / volta
-curl https://get.volta.sh | bash
+brew install volta
 volta install node
+
+# python / uv
+brew install uv
 
 # git のデフォルト
 git config --global user.name "taiyo@$(hostname) default"
