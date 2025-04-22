@@ -21,6 +21,9 @@ fi
 # apt - 全体でよく使うパッケージ
 apt-get install -y zsh avahi-daemon parallel wireguard-tools nkf iftop iotop rclone lm-sensors
 
+# Homebrew
+NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
 # カーネルパラメータを調整 - これしないとビッグデータ・webスクレープ系のワークロードが不安定になることがある
 echo "vm.swappiness=10" | tee -a /etc/sysctl.conf
 sysctl -p
