@@ -46,3 +46,4 @@ volta
 watch
 wget
 zlib
+rg
