@@ -77,3 +77,11 @@ export PATH="$HOME/flutter/bin:$PATH"
 
 # python / uv
 source p312/bin/activate
+
+# "tmux not working with git when ssh -A" issue. Only modify SSH_AUTH_SOCK when inside tmux
+if [ -n "$TMUX" ] && [ -S "$SSH_AUTH_SOCK" ]; then
+    # Only create/use symlink for tmux sessions
+    mkdir -p ~/.ssh
+    ln -sf "$SSH_AUTH_SOCK" ~/.ssh/ssh_auth_sock
+    export SSH_AUTH_SOCK=~/.ssh/ssh_auth_sock
+fi
