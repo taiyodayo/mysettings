@@ -23,6 +23,9 @@ while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 echo "✓ Password cached, continuing setup..."
 echo ""
 
+# レポはここに！！！！
+mkdir ~/dev
+
 # zsh周りの基本設定
 source ./setup_zsh_and_keys.sh
 
