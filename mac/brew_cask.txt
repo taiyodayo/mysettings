@@ -1,4 +1,5 @@
 font-fira-code-nerd-font
+font-fira-mono-nerd-font
 font-noto-sans-cjk
 font-source-code-pro
 font-source-sans-3
