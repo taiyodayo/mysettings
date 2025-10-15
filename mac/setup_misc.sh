@@ -1,21 +1,27 @@
 #!/usr/bin/env bash
 
-# Determine Homebrew path based on architecture
+# Determine Homebrew path based on architecture (more reliable check)
 if [ "$(uname)" = "Darwin" ]; then
-    if [ "$(uname -p)" = "arm64" ]; then
+    if [ "$(uname -m)" = "arm64" ]; then
         HOMEBREW_PREFIX="/opt/homebrew"
     else
         HOMEBREW_PREFIX="/usr/local"
     fi
+
     # Install Homebrew if not present
     if [ ! -f "${HOMEBREW_PREFIX}/bin/brew" ]; then
         echo "Installing Homebrew..."
-        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     fi
-    # Initialize brew in current session
-    eval "$(${HOMEBREW_PREFIX}/bin/brew shellenv)"
-fi
 
+    # Initialize brew in current session
+    if [ -f "${HOMEBREW_PREFIX}/bin/brew" ]; then
+        eval "$(${HOMEBREW_PREFIX}/bin/brew shellenv)"
+    else
+        echo "Error: Homebrew not found at ${HOMEBREW_PREFIX}"
+        exit 1
+    fi
+fi
 # Install brew packages from lists
 if [ -f "$SCRIPT_DIR/mac/brew_list.txt" ]; then
     cat "$SCRIPT_DIR/mac/brew_list.txt" | xargs brew install
@@ -33,7 +39,7 @@ if [ ! -d "$HOME/miniconda3" ]; then
         rm Miniconda3-latest-Linux-x86_64.sh
     fi
     if [ "$(uname)" = "Darwin" ]; then
-        if [ "$(uname -p)" = "arm64" ]; then
+        if [ "$(uname -m)" = "arm64" ]; then
             MINICONDA_INSTALLER="Miniconda3-latest-MacOSX-arm64.sh"
         else
             MINICONDA_INSTALLER="Miniconda3-latest-MacOSX-x86_64.sh"
