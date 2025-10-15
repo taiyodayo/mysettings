@@ -1,6 +1,7 @@
 aria2
 automake
 awscli
+google-cloud-sdk
 bash
 bat
 coreutils
