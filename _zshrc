@@ -76,7 +76,7 @@ alias ff='fvm flutter'
 export PATH="$HOME/flutter/bin:$PATH"
 
 # python / uv
-source p312/bin/activate
+source p313/bin/activate
 
 # "tmux not working with git when ssh -A" issue. Only modify SSH_AUTH_SOCK when inside tmux
 if [ -n "$TMUX" ] && [ -S "$SSH_AUTH_SOCK" ]; then
