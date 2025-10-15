@@ -36,7 +36,6 @@ rename
 shellcheck
 subversion
 telnet
-tldr
 tmux
 tree
 unar
