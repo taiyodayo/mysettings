@@ -27,3 +27,11 @@ git clone git@github.com:taiyodayo/mysettings.git
 cd ~/mysettings
 ./setup_mac_all.sh
 ```
+
+以上で、研究室の殆どの制作物はビルド出来るようになっているはずです。
+
+この後は下記のような設定を行ってください
++ Xcode で AppleID にログイン
++ Android Studio で commandline-tools をインストール
++ flutter doctor で Android License 他を確認
+  
