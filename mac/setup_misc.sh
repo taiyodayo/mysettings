@@ -1,116 +1,119 @@
 #!/usr/bin/env bash
-#set -euo pipefail
 
-# setup brew for macs
-if [ "$(uname)" = "Darwin" ] && [ ! -f /usr/local/bin/brew ]; then
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+# Determine Homebrew path based on architecture
+if [ "$(uname)" = "Darwin" ]; then
+    if [ "$(uname -p)" = "arm64" ]; then
+        HOMEBREW_PREFIX="/opt/homebrew"
+    else
+        HOMEBREW_PREFIX="/usr/local"
+    fi
+
+    # Install Homebrew if not present
+    if [ ! -f "${HOMEBREW_PREFIX}/bin/brew" ]; then
+        echo "Installing Homebrew..."
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    fi
+
+    # Initialize brew in current session
+    eval "$(${HOMEBREW_PREFIX}/bin/brew shellenv)"
 fi
 
-cat "$SCRIPT_DIR/mac/brew_list.txt" | xargs brew install
-cat "$SCRIPT_DIR/mac/brew_cask.txt" | xargs brew install --cask
-
-# java使わんからなぁ
-# setup sdkman for java
-# echo "setup sdkman for java:"
-# curl -s "https://get.sdkman.io" | bash && source "${HOME}/.sdkman/bin/sdkman-init.sh" && sdk install java
-
-# miniconda
-echo "Setting up miniconda"
-if [ "$(uname)" = "Linux" ]; then
-    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-    bash Miniconda3-latest-Linux-x86_64.sh
+# Install brew packages from lists
+if [ -f "$SCRIPT_DIR/mac/brew_list.txt" ]; then
+    cat "$SCRIPT_DIR/mac/brew_list.txt" | xargs brew install
 fi
 
-if [ "$(uname)" = "Darwin" ] && [ "$(uname -p)" = "arm64" ]; then
-    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-arm64.sh
-    bash Miniconda3-latest-MacOSX-arm64.sh
+if [ -f "$SCRIPT_DIR/mac/brew_cask.txt" ]; then
+    cat "$SCRIPT_DIR/mac/brew_cask.txt" | xargs brew install --cask
 fi
 
-if [ "$(uname)" = "Darwin" ] && [ "$(uname -p)" = "i386" ]; then
-    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh
-    bash Miniconda3-latest-MacOSX-x86_64.sh
+# Miniconda setup
+if [ ! -d "$HOME/miniconda3" ]; then
+    echo "Setting up miniconda..."
+
+    if [ "$(uname)" = "Linux" ]; then
+        wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+        bash Miniconda3-latest-Linux-x86_64.sh -b -p "$HOME/miniconda3"
+        rm Miniconda3-latest-Linux-x86_64.sh
+    fi
+
+    if [ "$(uname)" = "Darwin" ]; then
+        if [ "$(uname -p)" = "arm64" ]; then
+            MINICONDA_INSTALLER="Miniconda3-latest-MacOSX-arm64.sh"
+        else
+            MINICONDA_INSTALLER="Miniconda3-latest-MacOSX-x86_64.sh"
+        fi
+
+        wget -q "https://repo.anaconda.com/miniconda/${MINICONDA_INSTALLER}"
+        bash "${MINICONDA_INSTALLER}" -b -p "$HOME/miniconda3"
+        rm "${MINICONDA_INSTALLER}"
+    fi
 fi
 
-# Flutter Global
-# ARM64
-if [ "$(uname)" = "Darwin" ] && [ "$(uname -p)" = "arm64" ]; then
-    curl -O https://storage.googleapis.com/flutter_infra_release/releases/stable/macos/flutter_macos_arm64_3.24.3-stable.zip
-    unzip flutter_macos_arm64_3.24.3-stable.zip \
-        -d ~/
+# Initialize conda if available
+if [ -f "$HOME/miniconda3/bin/conda" ]; then
+    eval "$($HOME/miniconda3/bin/conda shell.bash hook)"
 fi
-# Intel
-if [ "$(uname)" = "Darwin" ] && [ "$(uname -p)" = "i386" ]; then
-    curl -O https://storage.googleapis.com/flutter_infra_release/releases/stable/macos/flutter_macos_3.24.3-stable.zip
-    unzip flutter_macos_3.24.3-stable.zip \
-        -d ~/
-fi
-# Start a subshell - upgrade flutter to latest stable
-(
-    # Change directory to ~/flutter or exit if it fails
-    cd ~/flutter || exit 1
-    # Run Flutter commands
-    flutter channel stable
-    flutter upgrade
-) # End of subshell
 
-# Flutter FVM
+# FVM for Flutter (no global Flutter installation)
 brew tap leoafarias/fvm
 brew install fvm
 
-# Flutter で cocoapods が必要 ruby は rbenv 使う！ rvm はトラブルだらけ
-brew install rbenv
-rbenv init
-export PATH="$HOME/.rbenv/bin:$PATH"
+# Install stable Flutter via FVM
+if ! fvm list 2>/dev/null | grep -q "stable"; then
+    echo "Installing Flutter stable via FVM..."
+    fvm install stable
+fi
+fvm global stable
+
+# Add FVM's global Flutter to PATH
+if [ ! -f ~/.zshrc ] || ! grep -q 'fvm/default/bin' ~/.zshrc; then
+    echo 'export PATH="$HOME/fvm/default/bin:$PATH"' >> ~/.zshrc
+fi
+
+# Ruby via rbenv
+brew install rbenv ruby-build
+
+# Initialize rbenv
 eval "$(rbenv init - zsh)"
-rbenv install 3.3.5
-rbenv global 3.3.5
-sudo gem install cocoapods
 
-# homebrew の ruby だと cocoapods が動かない
-# # Ruby - rbenv はインストールが遅い。homebrweの最新をそのまま使う
-# # Apple Silicon
-# if [ "$(uname)" = "Darwin" ] && [ "$(uname -p)" = "arm64" ]; then
-#     echo 'export PATH="/opt/homebrew/opt/ruby/bin:$PATH"' >>~/.zshrc
-# fi
-# # Intel
-# if [ "$(uname)" = "Darwin" ] && [ "$(uname -p)" = "i386" ]; then
-#     echo 'export PATH="/usr/local/opt/ruby/bin:$PATH"' >>~/.zshrc
-# fi
-# sudo gem install cocoapods
+# Get latest 3.3.x and install
+RUBY_VERSION=$(rbenv install -l | grep "^\s*3\.3\.[0-9]*$" | tail -1 | tr -d ' ')
+rbenv install -s ${RUBY_VERSION}
+rbenv global ${RUBY_VERSION}
 
-# NVMは遅い voltaに移行
-# # NVM で nodejs を管理
-# curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
-# export NVM_DIR="$HOME/.nvm"
-# [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"                   # This loads nvm
-# [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion" # This loads nvm bash_completion
-# nvm install --lts
-# nvm use --lts
+# Install cocoapods
+gem install cocoapods
 
-# nodejs は voltaで管理
+# Volta for Node.js
 brew install volta
-volta setup
-# このセッションでも使えるように
-export PATH="$HOME/.volta/bin:$PATH"
-# gatsby は node20 が必要
-zsh -c "volta install node@20"
 
-# システム python は uv で管理
-uv venv --python 3.12 p312
-source $HOME/p312/bin/activate
+# Initialize volta for this session
+export VOLTA_HOME="$HOME/.volta"
+export PATH="$VOLTA_HOME/bin:$PATH"
+
+# Install node 20
+volta install node@20
+
+# uv for Python
+brew install uv
+
+# Create Python venv if not present
+if [ ! -d "$HOME/p312" ]; then
+    uv venv --python 3.12 ~/p312
+fi
+
+source ~/p312/bin/activate
 uv pip install polars pandas numpy requests
 
-# メモを表示
-echo "brew packages installed."
-
+# Display messages
+echo ""
+echo "=========================================="
+echo "✓ Setup complete!"
+echo ""
 echo "XcodeはAppStore経由だと不安定な事が多いです。Apple Developerから直接ダウンロードを推奨します"
 echo "https://developer.apple.com/download/more/"
 echo ""
-
 echo "Google Chrome"
 echo "https://www.google.co.jp/chrome/"
-echo ""
-
-echo "Flutter は brew で入れると階層が深くなるので、手動でunzipしてインストールを"
-echo "https://docs.flutter.dev/get-started/install/macos"
-echo 'export PATH="$PATH:${HOME}/flutter/bin"' >>~/.zshrc
+echo "=========================================="
