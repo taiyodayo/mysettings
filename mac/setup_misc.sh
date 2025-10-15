@@ -68,6 +68,9 @@ fvm global stable
 if [ ! -f ~/.zshrc ] || ! grep -q 'fvm/default/bin' ~/.zshrc; then
     echo 'export PATH="$HOME/fvm/default/bin:$PATH"' >> ~/.zshrc
 fi
+export PATH="$HOME/fvm/default/bin:$PATH"
+# Verify Flutter installation
+flutter doctor
 
 # Ruby via rbenv
 brew install rbenv ruby-build
