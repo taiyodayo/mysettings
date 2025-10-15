@@ -7,17 +7,14 @@ if [ "$(uname)" = "Darwin" ]; then
     else
         HOMEBREW_PREFIX="/usr/local"
     fi
-
     if [ -f "${HOMEBREW_PREFIX}/bin/brew" ]; then
         eval "$(${HOMEBREW_PREFIX}/bin/brew shellenv)"
     fi
 fi
 
 echo "Installing R dependencies..."
-
 # brew packages required for R/tidyverse on Mac (brew handles duplicates)
 brew install libgit2 libsodium libtiff cmake libxml2 openssl curl harfbuzz fribidi
-
 # CRAN distribution (brew checks if already installed)
 brew install --cask r
 
