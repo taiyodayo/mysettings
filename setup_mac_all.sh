@@ -32,6 +32,18 @@ source ./mac/setup_misc.sh
 # R などデータサイエンス用パッケージを設定
 source ./mac/brew_tidyverse.sh
 
+# Android Studio の初回起動
+open -a "Android Studio"
+
+# xcode のインストール完了を待って、起動
+wait $install_pid
+open -a Xcode
+sleep 10
+sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+sudo xcodebuild -runFirstLaunch
+
+flutter doctor
+
 echo ""
 echo "=========================================="
 echo "✓ All setup complete!"

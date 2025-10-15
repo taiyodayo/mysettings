@@ -22,6 +22,7 @@ jq
 libuv
 little-cms2
 llvm
+mas
 mtr
 mupdf
 oath-toolkit

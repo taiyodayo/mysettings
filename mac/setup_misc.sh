@@ -30,6 +30,13 @@ if [ -f "$SCRIPT_DIR/mac/brew_cask.txt" ]; then
     cat "$SCRIPT_DIR/mac/brew_cask.txt" | xargs brew install --cask
 fi
 
+# mac App Store CLI (mas) requires user to be signed in
+echo "Installing Xcode from Appstore via mas. please login when prompted."
+# バックグラウンドで xcode インストールを開始。親側のスクリプトで、 wait $install_pid することでインストール完了を待てる
+nohup mas install 497799835 > /tmp/xcode-install.log 2>&1 &
+install_pid=$!
+open /Applications
+
 # Miniconda setup
 if [ ! -d "$HOME/miniconda3" ]; then
     echo "Setting up miniconda..."
