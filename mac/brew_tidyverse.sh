@@ -39,6 +39,6 @@ fi
 
 # Use pacman to install/load packages (p_load is idempotent - only installs missing packages)
 echo "Installing/updating tidyverse packages (this may take a while on first run)..."
-Rscript -e 'pacman::p_load(tidyverse, lubridate, stringr, languageserver, httpgd)'
+Rscript -e 'pacman::p_load(tidyverse, lubridate, stringr, languageserver)'
 
 echo "✓ R and tidyverse setup complete!"
