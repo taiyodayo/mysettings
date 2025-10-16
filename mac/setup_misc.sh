@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# homebrew はこの前にインストール済みにしてある
+# homebrew はこのスクリプトより前にインストールされている
 # Initialize brew in current session (handles architecture automatically)
 eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv)"
 # Install brew packages from lists
