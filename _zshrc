@@ -8,6 +8,11 @@ setopt interactivecomments
 # Initialize brew in current session (handles architecture automatically)
 eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv)"
 
+# Initialize direnv if available
+if command -v direnv >/dev/null 2>&1; then
+    eval "$(direnv hook zsh)"
+fi
+
 # Zinit install will fail if there is git is not installed (ubuntu-desktop default etc). Installing git if not found.
 # MacOS with Xcode should have git installed by default, but will try if apt fails.
 which git > /dev/null || (echo "installing git" && sudo apt-get install git || brew install git)
@@ -71,7 +76,7 @@ git config --global user.name "taiyo@$(hostname) default"
 git config --global user.email "taiyodayo@gmail.com"
 
 # python / uv
-source p313/bin/activate
+source ~/p313/bin/activate
 
 # "tmux not working with git when ssh -A" issue. Only modify SSH_AUTH_SOCK when inside tmux
 if [ -n "$TMUX" ] && [ -S "$SSH_AUTH_SOCK" ]; then

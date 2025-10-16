@@ -24,7 +24,7 @@ echo "✓ Password cached, continuing setup..."
 echo ""
 
 # レポはここに！！！！
-mkdir ~/dev
+mkdir -p ~/dev
 
 # zsh周りの基本設定
 source ./setup_zsh_and_keys.sh
