@@ -1,16 +1,8 @@
 #!/usr/bin/env bash
 
-# Install and initialize Homebrew
-if ! command -v brew >/dev/null 2>&1; then
-    echo "Installing Homebrew..."
-    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    # Initialize brew in current session (handles architecture automatically)
-    eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv)"
-fi
-# Add Homebrew to ~/.zshrc if not already there
-if [ ! -f ~/.zshrc ] || ! grep -q 'brew shellenv' ~/.zshrc; then
-    echo 'eval "$("$(brew --prefix)"/bin/brew shellenv)"' >> ~/.zshrc
-fi
+# homebrew はこの前にインストール済みにしてある
+# Initialize brew in current session (handles architecture automatically)
+eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv)"
 # Install brew packages from lists
 if [ -f "$SCRIPT_DIR/mac/brew_list.txt" ]; then
     cat "$SCRIPT_DIR/mac/brew_list.txt" | xargs brew install
