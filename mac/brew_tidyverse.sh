@@ -1,21 +1,12 @@
 #!/usr/bin/env bash
 
 # Ensure brew is available
-if [ "$(uname)" = "Darwin" ]; then
-    if [ "$(uname -m)" = "arm64" ]; then
-        HOMEBREW_PREFIX="/opt/homebrew"
-    else
-        HOMEBREW_PREFIX="/usr/local"
-    fi
-
-    if [ -f "${HOMEBREW_PREFIX}/bin/brew" ]; then
-        eval "$(${HOMEBREW_PREFIX}/bin/brew shellenv)"
-    fi
+if command -v brew >/dev/null 2>&1; then
+    eval "$(brew shellenv)"
 fi
 
 # brew packages required for R/tidyverse on Mac
 brew install libgit2 libsodium libtiff cmake libxml2 openssl curl harfbuzz fribidi
-
 # CRAN distribution
 brew install --cask r
 
@@ -29,4 +20,4 @@ if ! Rscript -e 'library(pacman)' 2>/dev/null; then
     Rscript -e 'install.packages("pacman", quiet=TRUE)'
 fi
 
-Rscript -e 'pacman::p_load(tidyverse, lubridate, stringr, languageserver)'
+Rscript -e 'pacman::p_load(tidyverse, languageserver)'

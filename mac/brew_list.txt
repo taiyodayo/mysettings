@@ -47,3 +47,5 @@ watch
 wget
 zlib
 rg
+ruby
+cocoapods
