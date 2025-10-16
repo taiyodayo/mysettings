@@ -42,17 +42,11 @@ fi
 export PATH="$HOME/fvm/default/bin:$PATH"
 # Verify Flutter installation
 flutter doctor
-
-# # Ruby via rbenv
-# brew install rbenv ruby-build
-# # Initialize rbenv
-# eval "$(rbenv init - zsh)"
-# # Get latest 3.3.x and install
-# RUBY_VERSION=$(rbenv install -l | grep "^\s*3\.3\.[0-9]*$" | tail -1 | tr -d ' ')
-# rbenv install -s ${RUBY_VERSION}
-# rbenv global ${RUBY_VERSION}
-# # Install cocoapods
-# gem install cocoapods
+# Add fvm flutter alias to ~/.zshrc if not already there
+if [ ! -f ~/.zshrc ] || ! grep -q "alias ff=" ~/.zshrc; then
+    echo "alias ff='fvm flutter'" >> ~/.zshrc
+fi
+alias ff='fvm flutter'
 
 # 2025 ruby/cocoapods はもう homebrew で入れるのが主流になった！
 brew install ruby cocoapods
@@ -62,7 +56,7 @@ if ! echo "$PATH" | grep -q "$(brew --prefix)/opt/ruby/bin"; then
     export PATH="$(brew --prefix)/opt/ruby/bin:$PATH"
 fi
 
-# Volta for Node.js
+# Volta for Node.js - 自動アクティベーション等、nvm より遥かに便利
 brew install volta
 # Initialize volta for this session
 export VOLTA_HOME="$HOME/.volta"
@@ -84,16 +78,9 @@ if [ ! -d "$HOME/p313" ]; then
     uv venv --python cpython-3.13 ~/p313
 fi
 source ~/p313/bin/activate
-uv pip install polars pandas numpy requests
+uv pip install polars pandas numpy requests pyarrow scikit-learn jupyter
 
 # Display messages
-echo ""
 echo "=========================================="
 echo "✓ Setup complete!"
-echo ""
-echo "XcodeはAppStore経由だと不安定な事が多いです。Apple Developerから直接ダウンロードを推奨します"
-echo "https://developer.apple.com/download/more/"
-echo ""
-echo "Google Chrome"
-echo "https://www.google.co.jp/chrome/"
 echo "=========================================="
