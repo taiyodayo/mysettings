@@ -26,35 +26,6 @@ nohup mas install 497799835 > /tmp/xcode-install.log 2>&1 &
 install_pid=$!
 open /Applications
 
-# Miniconda setup
-if [ ! -d "$HOME/miniconda3" ]; then
-    echo "Setting up miniconda..."
-    if [ "$(uname)" = "Linux" ]; then
-        wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-        bash Miniconda3-latest-Linux-x86_64.sh -b -p "$HOME/miniconda3"
-        rm Miniconda3-latest-Linux-x86_64.sh
-    fi
-    if [ "$(uname)" = "Darwin" ]; then
-        if [ "$(uname -m)" = "arm64" ]; then
-            MINICONDA_INSTALLER="Miniconda3-latest-MacOSX-arm64.sh"
-        else
-            MINICONDA_INSTALLER="Miniconda3-latest-MacOSX-x86_64.sh"
-        fi
-        wget -q "https://repo.anaconda.com/miniconda/${MINICONDA_INSTALLER}"
-        bash "${MINICONDA_INSTALLER}" -b -p "$HOME/miniconda3"
-        rm "${MINICONDA_INSTALLER}"
-    fi
-fi
-
-# Initialize conda if available
-if [ -f "$HOME/miniconda3/bin/conda" ]; then
-    eval "$($HOME/miniconda3/bin/conda shell.bash hook)"
-    # Add conda initialization to ~/.zshrc if not already there
-    if [ ! -f ~/.zshrc ] || ! grep -q 'conda initialize' ~/.zshrc; then
-        "$HOME/miniconda3/bin/conda" init zsh
-    fi
-fi
-
 # FVM for Flutter (no global Flutter installation)
 brew tap leoafarias/fvm
 brew install fvm
