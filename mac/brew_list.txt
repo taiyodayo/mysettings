@@ -49,3 +49,4 @@ zlib
 rg
 ruby
 cocoapods
+direnv
