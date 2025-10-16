@@ -65,6 +65,7 @@ export PATH="$VOLTA_HOME/bin:$PATH"
 if [ ! -f ~/.zshrc ] || ! grep -q 'VOLTA_HOME' ~/.zshrc; then
     echo 'export VOLTA_HOME="$HOME/.volta"' >> ~/.zshrc
     echo 'export PATH="$VOLTA_HOME/bin:$PATH"' >> ~/.zshrc
+    echo 'export PATH="$PATH":"$HOME/.pub-cache/bin"' >> ~/.zshrc
 fi
 # Install node lts
 volta install node@lts
@@ -76,6 +77,10 @@ uv python install cpython-3.13
 # Create Python venv if not present
 if [ ! -d "$HOME/p313" ]; then
     uv venv --python cpython-3.13 ~/p313
+fi
+# Add Homebrew to ~/.zshrc if not already there
+if [ ! -f ~/.zshrc ] || ! grep -q "$HOME/p313" ~/.zshrc; then
+    echo 'source ~/p313/bin/activate' >> ~/.zshrc
 fi
 source ~/p313/bin/activate
 uv pip install polars pandas numpy requests pyarrow scikit-learn jupyter
