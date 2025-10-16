@@ -42,6 +42,7 @@ alias ff='fvm flutter'
 
 # 2025 ruby/cocoapods はもう homebrew で入れるのが主流になった！
 brew install ruby cocoapods
+gem install xcodeproj
 # Ensure brew ruby is in PATH
 if ! echo "$PATH" | grep -q "$(brew --prefix)/opt/ruby/bin"; then
     echo 'export PATH="$(brew --prefix)/opt/ruby/bin:$PATH"' >> ~/.zshrc
