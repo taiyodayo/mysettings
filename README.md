@@ -26,9 +26,7 @@ cd ~/mysettings
 
 Mac の 環境設定 - 共有 から Remote login 、画面共有を有効にしておくと便利です
 ```
-# ssh を有効に
-sudo systemsetup -setremotelogin on
-# VNCはCLIでは有効にできない。システム環境設定を開く
+# SSH/VNCはCLIでは有効にできない。システム環境設定を開く【共有】を選択
 open "x-apple.systempreferences:com.apple.settings.Sharing"
 ```
 
