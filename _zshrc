@@ -5,6 +5,9 @@ setopt appendhistory
 # ハッシュをコメントとして無視する
 setopt interactivecomments
 
+# Initialize brew in current session (handles architecture automatically)
+eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv)"
+
 # Zinit install will fail if there is git is not installed (ubuntu-desktop default etc). Installing git if not found.
 # MacOS with Xcode should have git installed by default, but will try if apt fails.
 which git > /dev/null || (echo "installing git" && sudo apt-get install git || brew install git)
