@@ -55,8 +55,11 @@ source ./mac/brew_tidyverse.sh
 # 開発アプリ Xcode, android studio など
 echo "開発用アプリを開きます。ログイン、SDK Managerのセットアップを行ってください"
 
-# Android Studio の初回起動
+# Android Studio の初回起動と SDK Manager 表示
 open -a "Android Studio"
+osascript -e 'tell application id "com.google.android.studio" to activate' \
+          -e 'delay 0.3' \
+          -e 'tell application "System Events" to tell (first process whose bundle identifier is "com.google.android.studio") to click menu item "SDK Manager" of menu "Tools" of menu bar 1'
 
 # xcode のインストール完了を待って、起動
 wait $install_pid
