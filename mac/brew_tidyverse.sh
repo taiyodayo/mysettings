@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 
 # Ensure brew is available
-if command -v brew >/dev/null 2>&1; then
-    eval "$(brew shellenv)"
+if ! command -v brew >/dev/null 2>&1; then
+    echo "This script requires Homebrew. Install it first:"
+    echo '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+    exit 1
 fi
 
 # brew packages required for R/tidyverse on Mac
