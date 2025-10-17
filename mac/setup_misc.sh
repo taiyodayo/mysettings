@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 # homebrew はこのスクリプトより前にインストールされている
 # Initialize brew in current session (handles architecture automatically)
