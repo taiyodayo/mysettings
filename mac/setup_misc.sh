@@ -21,7 +21,7 @@ install_pid=$!
 brew tap leoafarias/fvm
 brew install fvm
 # Install stable Flutter via FVM
-if ! fvm list 2>/dev/null | grep -q "stable"; then
+if ! command -v fvm >/dev/null 2>&1 || ! fvm list 2>/dev/null | grep -q "stable"; then
     echo "Installing Flutter stable via FVM..."
     fvm install stable
 fi
