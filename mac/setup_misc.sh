@@ -60,7 +60,6 @@ export PATH="$VOLTA_HOME/bin:$PATH"
 if [ ! -f ~/.zshrc ] || ! grep -q 'VOLTA_HOME' ~/.zshrc; then
     echo 'export VOLTA_HOME="$HOME/.volta"' >> ~/.zshrc
     echo 'export PATH="$VOLTA_HOME/bin:$PATH"' >> ~/.zshrc
-    echo 'export PATH="$PATH":"$HOME/.pub-cache/bin"' >> ~/.zshrc
 fi
 # Install node lts
 volta install node@lts
