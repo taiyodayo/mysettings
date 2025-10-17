@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail 
+set -euo pipefail
 
 # このスクリプトの保存pathを取得
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,7 +28,7 @@ SUDO_KEEPER_PID=$$
 ) &
 SUDO_LOOP_PID=$!
 # Kill the loop when script exits
-trap "kill $SUDO_LOOP_PID 2>/dev/null" EXIT
+trap 'kill $SUDO_LOOP_PID 2>/dev/null' EXIT
 
 echo "✓ Password cached, continuing setup..."
 echo ""
@@ -42,8 +42,18 @@ source ./setup_zsh_and_keys.sh
 # homebrew 他を設定
 source ./mac/setup_misc.sh
 
+# iterm他を設定
+source ./mac/setup_gui_apps.sh
+
+# iterm2 を開いておく
+echo "iTerm2 を開きます。 Dock へのピン留めを推奨します"
+open -a iTerm
+
 # R などデータサイエンス用パッケージを設定
 source ./mac/brew_tidyverse.sh
+
+# 開発アプリ Xcode, android studio など
+echo "開発用アプリを開きます。ログイン、SDK Managerのセットアップを行ってください"
 
 # Android Studio の初回起動
 open -a "Android Studio"
