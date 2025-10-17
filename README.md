@@ -18,15 +18,15 @@ git コマンドがインストールされたので、このレポをクロー�
 git clone git@github.com:taiyodayo/mysettings.git
 ```
 
-セットアップを実行します
+セットアップを実行します - 実行機上の terminal.app を推奨します (でないとssh接続が切れると停止してしまう)
 ```
 cd ~/mysettings
 ./setup_mac_all.sh
 ```
 
 Mac の 環境設定 - 共有 から Remote login 、画面共有を有効にしておくと便利です
+SSH/VNCはCLIでは有効にできないので、「システム環境設定を開く【共有】」を表示して、ユーザに変更を促します
 ```
-# SSH/VNCはCLIでは有効にできない。システム環境設定を開く【共有】を選択
 open "x-apple.systempreferences:com.apple.settings.Sharing"
 ```
 
@@ -36,4 +36,3 @@ open "x-apple.systempreferences:com.apple.settings.Sharing"
 + Xcode で AppleID にログイン
 + Android Studio で commandline-tools をインストール
 + flutter doctor で Android License 他を確認
-  
