@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # iterm2 のデフォルト設定をコピー
-if ! brew list --cask | grep -q "^iterm2\$"; then
+if brew list --cask | grep -q "^iterm2\$"; then
     echo "Copying iTerm2 default settings"
     cp "./mac/resources/com.googlecode.iterm2.plist" ~/Library/Preferences/
 fi
