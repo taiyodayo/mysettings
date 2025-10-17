@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 # Backup .zshrc if it exists
 if [ -f ~/.zshrc ]; then
