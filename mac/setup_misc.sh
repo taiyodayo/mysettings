@@ -16,7 +16,6 @@ echo "Installing Xcode from Appstore via mas. please login when prompted."
 # バックグラウンドで xcode インストールを開始。親側のスクリプトで、 wait $install_pid することでインストール完了を待てる
 nohup mas install 497799835 > /tmp/xcode-install.log 2>&1 &
 install_pid=$!
-open /Applications
 
 # FVM for Flutter (no global Flutter installation)
 brew tap leoafarias/fvm
