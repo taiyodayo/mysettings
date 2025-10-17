@@ -53,8 +53,10 @@ open -a iTerm
 source ./mac/brew_tidyverse.sh
 
 # 開発アプリ Xcode, android studio など
-echo "開発用アプリを開きます。ログイン、SDK Managerのセットアップを行ってください"
+echo "開発者向けポストインストールメモをブラウザで開きます"
+open "https://github.com/taiyodayo/mysettings/blob/main/mac/postinstall_note.md"
 
+echo "開発用アプリを開きます。ログイン、SDK Managerのセットアップを行ってください"
 # Android Studio の初回起動と SDK Manager 表示
 open -a "Android Studio"
 osascript -e 'tell application id "com.google.android.studio" to activate' \
@@ -62,6 +64,7 @@ osascript -e 'tell application id "com.google.android.studio" to activate' \
           -e 'tell application "System Events" to tell (first process whose bundle identifier is "com.google.android.studio") to click menu item "SDK Manager" of menu "Tools" of menu bar 1'
 
 # xcode のインストール完了を待って、起動
+echo "Xcode のインストールを待っています。完了したら、Xcode を起動します"
 wait $install_pid
 sleep 10
 sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
