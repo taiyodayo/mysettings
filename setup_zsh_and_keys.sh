@@ -25,13 +25,15 @@ echo "Copied new .p10k.zsh"
 mkdir -p ~/.ssh/
 chmod 700 ~/.ssh/
 
+# Fetch the key first
+GITHUB_KEY=$(curl -fsSL https://github.com/taiyodayo.keys | grep ed25519)
 # Add SSH key only if not already present (FIXED: no duplicates)
-if [ ! -f ~/.ssh/authorized_keys ] || ! grep -q "taiyodayo" ~/.ssh/authorized_keys; then
-    curl -ss https://github.com/taiyodayo.keys | grep ed25519 >> ~/.ssh/authorized_keys
+if [ ! -f ~/.ssh/authorized_keys ] || ! grep -qF "$GITHUB_KEY" ~/.ssh/authorized_keys; then
+    echo "$GITHUB_KEY" >> ~/.ssh/authorized_keys
     chmod 600 ~/.ssh/authorized_keys
-    echo "Added taiyodayo's SSH key"
+    echo "Added @taiyodayo's SSH key"
 else
-    echo "taiyodayo's SSH key already present"
+    echo "@taiyodayo's SSH key already present"
 fi
 
 echo "taiyodayo's default env and keys copied to your home directory"
