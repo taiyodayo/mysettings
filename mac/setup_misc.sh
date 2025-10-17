@@ -27,11 +27,13 @@ if ! fvm list 2>/dev/null | grep -q "stable"; then
     fvm install stable
 fi
 fvm global stable
-# Add FVM's global Flutter to PATH
+# Add FVM's global Flutter and dart pub install bin to PATH
+export PATH="$HOME/fvm/default/bin:$PATH"
+export PATH="$PATH":"$HOME/.pub-cache/bin"
 if [ ! -f ~/.zshrc ] || ! grep -q 'fvm/default/bin' ~/.zshrc; then
     echo 'export PATH="$HOME/fvm/default/bin:$PATH"' >> ~/.zshrc
+    echo 'export PATH="$PATH":"$HOME/.pub-cache/bin"' >> ~/.zshrc
 fi
-export PATH="$HOME/fvm/default/bin:$PATH"
 # Verify Flutter installation
 flutter doctor
 # Add fvm flutter alias to ~/.zshrc if not already there
@@ -43,9 +45,9 @@ alias ff='fvm flutter'
 # 2025 ruby/cocoapods はもう homebrew で入れるのが主流になった！
 brew install ruby cocoapods
 # Ensure brew ruby is in PATH
+export PATH="$(brew --prefix)/opt/ruby/bin:$PATH"
 if ! echo "$PATH" | grep -q "$(brew --prefix)/opt/ruby/bin"; then
     echo 'export PATH="$(brew --prefix)/opt/ruby/bin:$PATH"' >> ~/.zshrc
-    export PATH="$(brew --prefix)/opt/ruby/bin:$PATH"
 fi
 gem install xcodeproj
 
