@@ -15,10 +15,19 @@ echo "  - R (system frameworks)"
 echo "  - Other development tools"
 echo ""
 echo "Please enter your password once:"
+# Request sudo upfront
 sudo -v
-
-# Keep sudo alive in background until script exits
-while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+# Keep sudo alive in background
+SUDO_KEEPER_PID=$$
+(
+    while kill -0 "$SUDO_KEEPER_PID" 2>/dev/null; do
+        sudo -n true
+        sleep 50
+    done
+) &
+SUDO_LOOP_PID=$!
+# Kill the loop when script exits
+trap "kill $SUDO_LOOP_PID 2>/dev/null" EXIT
 
 echo "✓ Password cached, continuing setup..."
 echo ""
@@ -40,10 +49,12 @@ open -a "Android Studio"
 
 # xcode のインストール完了を待って、起動
 wait $install_pid
-open -a Xcode
 sleep 10
 sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
-sudo xcodebuild -runFirstLaunch
+sudo xcodebuild -license accept      # Accepts license, no prompt
+sudo xcodebuild -runFirstLaunch      # Runs first launch tasks, no prompt
+sleep 5
+open -a Xcode
 
 flutter doctor
 
