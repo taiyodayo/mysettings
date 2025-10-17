@@ -26,6 +26,7 @@ macOS Onboarding — ED25519 SSH Key → GitHub → Post to Chat
 + 「公開鍵（パブキー）」 - チームメンバーや世界中の人と広く共有してください
 + 「暗号鍵（プライベートキー）」 - 誰にも絶対に見せないで、自分だけがアクセス出来る所に安全に保管してください
 (自分専用の GoogleDrive へ、バックアップを推奨します)
++ Mac での手順を示します。Linux でもほぼ同様ですので必要な方は調べてみてください
 
 ## ED25519 暗号鍵作成 日本語ガイド
 
@@ -83,18 +84,18 @@ Hi <あなたのユーザー名>! You've successfully authenticated, but GitHub 
 
 以下の部屋に投稿してください：
 
-チャット部屋：**[https://mail.google.com/chat/u/0/#chat/space/AAAAUqO4zBc](https://mail.google.com/chat/u/0/#chat/space/AAAAUqO4zBc)**
+プロジェクト以心伝心(事前の招待が必要です)：**[https://mail.google.com/chat/u/0/#chat/space/AAAAUqO4zBc](https://mail.google.com/chat/u/0/#chat/space/AAAAUqO4zBc)**
 
 次をコピペして自分の情報に置き換えます：
 
 ```
-GitHub: <あなたのユーザー名>
+GitHub: <あなたの github ユーザー名>
 SSH Public Key:
-<~/.ssh/id_ed25519.pub の全文（1 行）を貼り付け>
+< `cat ~/.ssh/id_ed25519.pub` コマンドで表示された内容をそのまま貼り付け >
 ```
 
 > ✅ 共有してよいのは **`.pub` の行だけ**。
-> ❌ **`~/.ssh/id_ed25519`（秘密鍵）** は絶対に共有しないでください。
+> ❌ **`~/.ssh/id_ed25519`（秘密鍵）** は絶対に共有しないでください！！
 
 ### 6) Git リモートを SSH に変更（推奨）
 
@@ -124,9 +125,6 @@ git remote set-url origin git@github.com:org/repo.git
     ssh -vT git@github.com
     ```
 
-
-> Two versions below: **English** and **日本語**. Keep it simple. No Keychain steps.
-> Platform: **macOS only**.
 
 ---
 
