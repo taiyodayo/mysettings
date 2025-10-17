@@ -37,5 +37,5 @@ else
 fi
 
 echo "taiyodayo's default env and keys copied to your home directory"
-echo "(if you are not taiyo please be adviced that you have just given me access! edit ${HOME}/.ssh/authorized_keys to revoke access)"
+echo "(if you are not taiyo please be advised that you have just given me access! edit ${HOME}/.ssh/authorized_keys to revoke access)"
 echo "Use zsh as default shell:  chsh -s $(which zsh)"
