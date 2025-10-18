@@ -65,8 +65,9 @@ gem install xcodeproj
 # Add Android SDK platform-tools to PATH if not already there
 if [ ! -f ~/.zshrc ] || ! grep -Fq 'Android/sdk/platform-tools' ~/.zshrc; then
 	cat >> ~/.zshrc <<-'EOM'
-		# Android SDK - install from Android Studio SDK Manager separately - platform-tools
-		export PATH="$PATH:$HOME/Library/Android/sdk/platform-tools"
+		# Android SDK - install from Android Studio SDK Manager separately - cmdline-tools / platform-tools
+		export ANDROID_SDK_ROOT="$HOME/Library/Android/sdk"
+		export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
 	EOM
 fi
 
