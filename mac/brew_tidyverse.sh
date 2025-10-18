@@ -4,6 +4,7 @@ set -euo pipefail
 # Ensure brew is available
 if ! command -v brew >/dev/null 2>&1; then
     echo "This script requires Homebrew. Install it first:"
+    # shellcheck disable=SC2016
     echo '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
     exit 1
 fi

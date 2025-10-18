@@ -9,14 +9,15 @@ if [ -f "$SCRIPT_DIR/mac/brew_list.txt" ]; then
     cat "$SCRIPT_DIR/mac/brew_list.txt" | xargs brew install
 fi
 if [ -f "$SCRIPT_DIR/mac/brew_cask.txt" ]; then
-    cat "$SCRIPT_DIR/mac/brew_cask.txt" | xargs brew install --cask
+    cat "$SCRIPT_DIR/mac/brew_cask.txt" | xargs brew install --cask --force
 fi
 
 # mac App Store CLI (mas) requires user to be signed in
 echo "Installing Xcode from Appstore via mas. please login when prompted."
 # バックグラウンドで xcode インストールを開始。親側のスクリプトで、 wait $install_pid することでインストール完了を待てる
 nohup mas install 497799835 > /tmp/xcode-install.log 2>&1 &
-install_pid=$!
+# この値で、親側スクリプトの最後に wait します
+export install_pid=$!
 
 # FVM for Flutter (no global Flutter installation)
 brew tap leoafarias/fvm
@@ -36,8 +37,10 @@ done
 export PATH="$HOME/fvm/default/bin:$PATH"
 export PATH="$PATH":"$HOME/.pub-cache/bin"
 if [ ! -f ~/.zshrc ] || ! grep -q 'fvm/default/bin' ~/.zshrc; then
-    echo 'export PATH="$HOME/fvm/default/bin:$PATH"' >> ~/.zshrc
-    echo 'export PATH="$PATH":"$HOME/.pub-cache/bin"' >> ~/.zshrc
+	cat >> ~/.zshrc <<-'EOM'
+	export PATH="$HOME/fvm/default/bin:$PATH"
+	export PATH="$PATH":"$HOME/.pub-cache/bin"
+	EOM
 fi
 # Verify Flutter installation
 flutter doctor
@@ -53,7 +56,9 @@ brew install ruby cocoapods
 RUBY_PATH="$(brew --prefix)/opt/ruby/bin"
 export PATH="$RUBY_PATH:$PATH"
 if [ ! -f ~/.zshrc ] || ! grep -qF "$RUBY_PATH" ~/.zshrc; then
-    echo 'export PATH="$(brew --prefix)/opt/ruby/bin:$PATH"' >> ~/.zshrc
+	cat >> ~/.zshrc <<-'EOM'
+	export PATH="$(brew --prefix)/opt/ruby/bin:$PATH"
+	EOM
 fi
 gem install xcodeproj
 
@@ -63,10 +68,14 @@ brew install volta
 export VOLTA_HOME="$HOME/.volta"
 export PATH="$VOLTA_HOME/bin:$PATH"
 # Add Volta to PATH in ~/.zshrc if not already there
-if [ ! -f ~/.zshrc ] || ! grep -q 'VOLTA_HOME' ~/.zshrc; then
-    echo 'export VOLTA_HOME="$HOME/.volta"' >> ~/.zshrc
-    echo 'export PATH="$VOLTA_HOME/bin:$PATH"' >> ~/.zshrc
+if [ ! -f ~/.zshrc ] || ! grep -Fq 'export VOLTA_HOME=' ~/.zshrc; then
+	cat >> ~/.zshrc <<-'EOM'
+	# Volta
+	export VOLTA_HOME="$HOME/.volta"
+	export PATH="$VOLTA_HOME/bin:$PATH"
+	EOM
 fi
+
 # Install node lts
 volta install node@lts
 
@@ -82,7 +91,8 @@ fi
 if [ ! -f ~/.zshrc ] || ! grep -q "$HOME/p313" ~/.zshrc; then
     echo 'source ~/p313/bin/activate' >> ~/.zshrc
 fi
-source ~/p313/bin/activate
+# shellcheck source=/dev/null
+source "$HOME/p313/bin/activate"
 uv pip install polars pandas numpy requests pyarrow scikit-learn jupyter
 
 # Display messages

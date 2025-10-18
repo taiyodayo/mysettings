@@ -33,20 +33,20 @@ trap 'kill $SUDO_LOOP_PID 2>/dev/null' EXIT
 echo "✓ Password cached, continuing setup..."
 echo ""
 
-# レポはここに！！！！
+# 開発用レポはここに！！！！ 古いツールがバカ面倒になる時がある
 mkdir -p ~/dev
 
 # zsh周りの基本設定
 source ./setup_zsh_and_keys.sh
 
 # homebrew 他を設定
-source ./mac/setup_misc.sh
+source ./mac/setup_cli_tools.sh
 
 # iterm他を設定
 source ./mac/setup_gui_apps.sh
 
 # iterm2 を開いておく
-echo "iTerm2 を開きます。 Dock へのピン留めを推奨します"
+echo "iTerm2 を開きます。 以後はシステム内蔵でなくこちらを使用します"
 open -a iTerm
 
 # R などデータサイエンス用パッケージを設定
@@ -66,11 +66,13 @@ osascript -e 'tell application id "com.google.android.studio" to activate' \
 # xcode のインストール完了を待って、起動
 echo "Xcode のインストールを待っています。完了したら、Xcode を起動します"
 wait $install_pid
-sleep 10
-sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
-sudo xcodebuild -license accept      # Accepts license, no prompt
-sudo xcodebuild -runFirstLaunch      # Runs first launch tasks, no prompt
-sleep 5
+# ここ、コマンドで処理してしまうと、Xcode の初回起動時のダイアログが出ない
+# iOS 開発に必要なシミュレータなどコンポーネントのインストールも走らないので、open で起動して手動操作を促す
+# sleep 10
+# sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+# sudo xcodebuild -license accept      # Accepts license, no prompt
+# sudo xcodebuild -runFirstLaunch      # Runs first launch tasks, no prompt
+# sleep 5
 open -a Xcode
 
 flutter doctor
