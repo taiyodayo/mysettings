@@ -62,6 +62,14 @@ if [ ! -f ~/.zshrc ] || ! grep -qF "$RUBY_PATH" ~/.zshrc; then
 fi
 gem install xcodeproj
 
+# Add Android SDK platform-tools to PATH if not already there
+if [ ! -f ~/.zshrc ] || ! grep -Fq 'Android/sdk/platform-tools' ~/.zshrc; then
+	cat >> ~/.zshrc <<-'EOM'
+		# Android SDK - install from Android Studio SDK Manager separately - platform-tools
+		export PATH="$PATH:$HOME/Library/Android/sdk/platform-tools"
+	EOM
+fi
+
 # Volta for Node.js - 自動アクティベーション等、nvm より遥かに便利
 brew install volta
 # Initialize volta for this session
@@ -75,7 +83,6 @@ if [ ! -f ~/.zshrc ] || ! grep -Fq 'export VOLTA_HOME=' ~/.zshrc; then
 		export PATH="$VOLTA_HOME/bin:$PATH"
 	EOM
 fi
-
 # Install node lts
 volta install node@lts
 
@@ -95,13 +102,6 @@ fi
 source "$HOME/p313/bin/activate"
 uv pip install polars pandas numpy requests pyarrow scikit-learn jupyter
 
-# Add Android SDK platform-tools to PATH if not already there
-if [ ! -f ~/.zshrc ] || ! grep -Fq 'Android/sdk/platform-tools' ~/.zshrc; then
-	cat >> ~/.zshrc <<-'EOM'
-		# Android SDK - install from Android Studio SDK Manager separately - platform-tools
-		export PATH="$PATH:$HOME/Library/Android/sdk/platform-tools"
-	EOM
-fi
 
 # Display messages
 echo "=========================================="
