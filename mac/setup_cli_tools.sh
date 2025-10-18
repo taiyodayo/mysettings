@@ -38,8 +38,8 @@ export PATH="$HOME/fvm/default/bin:$PATH"
 export PATH="$PATH":"$HOME/.pub-cache/bin"
 if [ ! -f ~/.zshrc ] || ! grep -q 'fvm/default/bin' ~/.zshrc; then
 	cat >> ~/.zshrc <<-'EOM'
-	export PATH="$HOME/fvm/default/bin:$PATH"
-	export PATH="$PATH":"$HOME/.pub-cache/bin"
+		export PATH="$HOME/fvm/default/bin:$PATH"
+		export PATH="$PATH":"$HOME/.pub-cache/bin"
 	EOM
 fi
 # Verify Flutter installation
@@ -70,9 +70,9 @@ export PATH="$VOLTA_HOME/bin:$PATH"
 # Add Volta to PATH in ~/.zshrc if not already there
 if [ ! -f ~/.zshrc ] || ! grep -Fq 'export VOLTA_HOME=' ~/.zshrc; then
 	cat >> ~/.zshrc <<-'EOM'
-	# Volta
-	export VOLTA_HOME="$HOME/.volta"
-	export PATH="$VOLTA_HOME/bin:$PATH"
+		# Volta
+		export VOLTA_HOME="$HOME/.volta"
+		export PATH="$VOLTA_HOME/bin:$PATH"
 	EOM
 fi
 
@@ -94,6 +94,14 @@ fi
 # shellcheck source=/dev/null
 source "$HOME/p313/bin/activate"
 uv pip install polars pandas numpy requests pyarrow scikit-learn jupyter
+
+# Add Android SDK platform-tools to PATH if not already there
+if [ ! -f ~/.zshrc ] || ! grep -Fq 'Android/sdk/platform-tools' ~/.zshrc; then
+	cat >> ~/.zshrc <<-'EOM'
+		# Android SDK - install from Android Studio SDK Manager separately - platform-tools
+		export PATH="$PATH:$HOME/Library/Android/sdk/platform-tools"
+	EOM
+fi
 
 # Display messages
 echo "=========================================="
