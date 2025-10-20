@@ -2,9 +2,11 @@ HISTFILE=~/.zsh_history
 SAVEHIST=1000
 HISTSIZE=1000
 setopt appendhistory
-# ハッシュをコメントとして無視する
-setopt interactivecomments
-setopt extended_glob
+# zsh のオススメ設定
+setopt interactivecomments  # ハッシュをコメントとして無視する (bashのように)
+setopt extended_glob        # 拡張グロブを有効にする
+setopt glob_dots            # 隠しファイルをグロブに含める (bashのように)
+setopt no_beep              # うるさいビープ音を止める
 
 # Initialize brew in current session (handles architecture automatically)
 # Bootstrap brew from install location
