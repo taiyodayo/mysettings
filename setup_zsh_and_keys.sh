@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Install zsh if not present
+# Install zsh if not present (this is for debian/ubuntu systems. macOS has zsh by default.)
 if ! command -v zsh >/dev/null 2>&1; then
     echo "Installing zsh..."
     sudo apt-get update && sudo apt-get install -y zsh
 fi
+echo "Use zsh as default shell:"
+chsh -s "$(which zsh)"
 
 # Backup .zshrc if it exists
 if [ -f ~/.zshrc ]; then
@@ -59,7 +61,3 @@ if [ ! -f ~/.ssh/authorized_keys ] || ! grep -qF "$GITHUB_KEY" ~/.ssh/authorized
 else
     echo "@${github_user}'s SSH key already present"
 fi
-
-echo "taiyodayo's default env and keys copied to your home directory"
-echo "(if you are not taiyo please be advised that you have just given me access! edit ${HOME}/.ssh/authorized_keys to revoke access)"
-echo "Use zsh as default shell:  chsh -s $(which zsh)"
