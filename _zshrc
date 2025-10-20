@@ -7,7 +7,13 @@ setopt interactivecomments
 setopt extended_glob
 
 # Initialize brew in current session (handles architecture automatically)
-eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv)"
+# Bootstrap brew from install location
+for brew_path in /opt/homebrew/bin/brew /usr/local/bin/brew /home/linuxbrew/.linuxbrew/bin/brew; do
+    if [[ -x "$brew_path" ]]; then
+        eval "$($brew_path shellenv)"
+        break
+    fi
+done
 
 # Initialize direnv if available
 if command -v direnv >/dev/null 2>&1; then
