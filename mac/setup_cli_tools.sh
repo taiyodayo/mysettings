@@ -12,6 +12,36 @@ if [ -f "$SCRIPT_DIR/mac/brew_cask.txt" ]; then
     cat "$SCRIPT_DIR/mac/brew_cask.txt" | xargs brew install --cask --force
 fi
 
+# Add GNU utils to .zshrc (macOS only)
+if [[ "$OSTYPE" == "darwin"* ]]; then
+	if [[ $(uname -m) == "arm64" ]]; then
+		# Apple Silicon
+		cat >> ~/.zshrc <<- 'EOF'
+			# Use GNU coreutils without g prefix
+			PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH"
+			PATH="/opt/homebrew/opt/findutils/libexec/gnubin:$PATH"
+			PATH="/opt/homebrew/opt/grep/libexec/gnubin:$PATH"
+			PATH="/opt/homebrew/opt/gnu-sed/libexec/gnubin:$PATH"
+			PATH="/opt/homebrew/opt/gnu-tar/libexec/gnubin:$PATH"
+			PATH="/opt/homebrew/opt/gnu-getopt/bin:$PATH"
+			export USE_GNU_UTILS="true"
+		EOF
+	else
+		# Intel
+		cat >> ~/.zshrc <<- 'EOF'
+			# Use GNU coreutils without g prefix
+			PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
+			PATH="/usr/local/opt/findutils/libexec/gnubin:$PATH"
+			PATH="/usr/local/opt/grep/libexec/gnubin:$PATH"
+			PATH="/usr/local/opt/gnu-sed/libexec/gnubin:$PATH"
+			PATH="/usr/local/opt/gnu-tar/libexec/gnubin:$PATH"
+			PATH="/usr/local/opt/gnu-getopt/bin:$PATH"
+			export USE_GNU_UTILS="true"
+		EOF
+	fi
+	echo "Added GNU utils PATH to .zshrc"
+fi
+
 # mac App Store CLI (mas) requires user to be signed in
 echo "Installing Xcode from Appstore via mas. please login when prompted."
 # バックグラウンドで xcode インストールを開始。親側のスクリプトで、 wait $install_pid することでインストール完了を待てる
@@ -60,9 +90,12 @@ if [ ! -f ~/.zshrc ] || ! grep -qF "$RUBY_PATH" ~/.zshrc; then
 	export PATH="$(brew --prefix)/opt/ruby/bin:$PATH"
 	EOM
 fi
+# brew で入れる場合、gemでの xcodeproj インストールが必要
 gem install xcodeproj
 
 # Add Android SDK platform-tools to PATH if not already there
+export ANDROID_SDK_ROOT="$HOME/Library/Android/sdk"
+export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
 if [ ! -f ~/.zshrc ] || ! grep -Fq 'Android/sdk/platform-tools' ~/.zshrc; then
 	cat >> ~/.zshrc <<-'EOM'
 		# Android SDK - install from Android Studio SDK Manager separately - cmdline-tools / platform-tools
