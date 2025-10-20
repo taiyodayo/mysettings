@@ -43,8 +43,26 @@ chmod 700 ~/.ssh/
 # Prompt for GitHub username and fetch SSH key
 while true; do
     read -r -p "Enter GitHub username: " github_user
-    GITHUB_KEY=$(curl -fsSL "https://github.com/${github_user}.keys" | grep ed25519)
-    if [ -n "$GITHUB_KEY" ]; then
+    # 1. Extract *only* alphanumeric chars and hyphens.
+    github_user=${github_user//[^a-zA-Z0-9-]/}
+    # 2. Truncate to GitHub's 39-character limit
+    github_user=${github_user:0:39}
+    # this is the username sanitised
+    echo "Sanitized username: $github_user"
+    # Check if the username is now empty
+    if [ -z "$github_user" ]; then
+        echo "Empty username. Please try again."
+        continue
+    fi
+
+    echo "Checking for user: $github_user"
+    GITHUB_KEY=$(curl -fsSL "https://github.com/${github_user}.keys" | \
+                grep -E '^ssh-ed25519 [A-Za-z0-9+/]+=* ' | \
+                head -n 1)
+    # Validate it's a proper SSH key format
+    if echo "$GITHUB_KEY" | ssh-keygen -lf - &>/dev/null; then
+        echo "Found valid ed25519 key for $github_user:"
+        echo "$GITHUB_KEY"
         break
     else
         echo "No ed25519 SSH key found for GitHub user: $github_user"
