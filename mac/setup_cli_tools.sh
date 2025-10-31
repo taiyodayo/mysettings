@@ -49,37 +49,39 @@ nohup mas install 497799835 > /tmp/xcode-install.log 2>&1 &
 # この値で、親側スクリプトの最後に wait します
 export install_pid=$!
 
-# FVM for Flutter (no global Flutter installation)
-brew tap leoafarias/fvm
-brew install fvm
-# Install stable Flutter via FVM
-if ! command -v fvm >/dev/null 2>&1 || ! fvm list 2>/dev/null | grep -q "stable"; then
-    echo "Installing Flutter stable via FVM..."
-    fvm install stable
-fi
-fvm global stable
-# Wait for symlink to be ready
-until [ -d "$HOME/fvm/default" ]; do
-    echo "Waiting for FVM global symlink..."
-    sleep 1
-done
-# Add FVM's global Flutter and dart pub install bin to PATH
-export PATH="$HOME/fvm/default/bin:$PATH"
-export PATH="$PATH":"$HOME/.pub-cache/bin"
-if [ ! -f ~/.zshrc ] || ! grep -q 'fvm/default/bin' ~/.zshrc; then
+# dartのバージョンが大きく動いた時、 例えば 3.0 -> 4.0 のような場合、fvm 経由でインストールされる Flutter にバンドルされている dart sdk のバージョンが古く、fvm 自体が動かなくなる事がある。
+brew install dart
+# --- PATH for current session ---
+export PATH="$HOME/.pub-cache/bin:$PATH"                 # dart pub の実行ファイル
+BREW_PREFIX="$(brew --prefix)"
+export PATH="$BREW_PREFIX/opt/ruby/bin:$PATH"            # Homebrew の Ruby
+# Append FVM/Ruby PATH block to ~/.zshrc once (idempotent), using <<- with tab-indented body
+if ! grep -q '^## BEGIN FVM/Ruby PATH$' ~/.zshrc 2>/dev/null; then
 	cat >> ~/.zshrc <<-'EOM'
-		export PATH="$HOME/fvm/default/bin:$PATH"
-		export PATH="$PATH":"$HOME/.pub-cache/bin"
+		## BEGIN FVM/Ruby PATH
+		export PATH="$HOME/.pub-cache/bin:$PATH"
+		# FVM のグローバル Flutter（存在すれば）
+		if [ -d "$HOME/fvm/default/bin" ]; then export PATH="$PATH:$HOME/fvm/default/bin"; fi
+		# Homebrew Ruby（Apple Silicon 想定）
+		export PATH="$(/opt/homebrew/bin/brew --prefix)/opt/ruby/bin:$PATH"
+		alias ff='fvm flutter'
+		## END FVM/Ruby PATH
 	EOM
 fi
-# Verify Flutter installation
+# --- FVM & Flutter ---
+dart pub global activate fvm                              # FVM を dart pub で導入
+fvm install stable                                        # Flutter stable を取得
+fvm global stable                                         # グローバルに設定
+export PATH="$PATH:$HOME/fvm/default/bin"                 # すぐ使えるように PATH 追加
+# --- Quick sanity ---
+fvm --version                                             # 動作確認
+flutter --version
 flutter doctor
 # Add fvm flutter alias to ~/.zshrc if not already there
 if [ ! -f ~/.zshrc ] || ! grep -q "alias ff=" ~/.zshrc; then
     echo "alias ff='fvm flutter'" >> ~/.zshrc
 fi
 alias ff='fvm flutter'
-
 # 2025 ruby/cocoapods はもう homebrew で入れるのが主流になった！
 brew install ruby cocoapods
 # Ensure brew ruby is in PATH
@@ -90,7 +92,6 @@ if [ ! -f ~/.zshrc ] || ! grep -qF "$RUBY_PATH" ~/.zshrc; then
 	export PATH="$(brew --prefix)/opt/ruby/bin:$PATH"
 	EOM
 fi
-# brew で入れる場合、gemでの xcodeproj インストールが必要
 gem install xcodeproj
 
 # Add Android SDK platform-tools to PATH if not already there
