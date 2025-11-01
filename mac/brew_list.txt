@@ -5,7 +5,6 @@ google-cloud-sdk
 bash
 bat
 coreutils
-epubcheck
 findutils
 gh
 git
@@ -27,7 +26,6 @@ mtr
 mupdf
 oath-toolkit
 parallel
-pdftk-java
 pigz
 poppler
 pstree
