@@ -50,7 +50,7 @@ nohup mas install 497799835 > /tmp/xcode-install.log 2>&1 &
 export install_pid=$!
 
 # dartのバージョンが大きく動いた時、 例えば 3.0 -> 4.0 のような場合、fvm 経由でインストールされる Flutter にバンドルされている dart sdk のバージョンが古く、fvm 自体が動かなくなる事がある。
-brew install dart
+brew install dart-sdk
 # --- PATH for current session ---
 export PATH="$HOME/.pub-cache/bin:$PATH"                 # dart pub の実行ファイル
 BREW_PREFIX="$(brew --prefix)"
