@@ -42,7 +42,7 @@ chmod 700 ~/.ssh/
 
 # Prompt for GitHub username and fetch SSH key
 while true; do
-    read -r -p "Enter GitHub username: " github_user
+    read -r -p "Enter GitHub username for ED25119 key retrieval: " github_user
     # 1. Extract *only* alphanumeric chars and hyphens.
     github_user=${github_user//[^a-zA-Z0-9-]/}
     # 2. Truncate to GitHub's 39-character limit
@@ -57,7 +57,7 @@ while true; do
 
     echo "Checking for user: $github_user"
     GITHUB_KEY=$(curl -fsSL "https://github.com/${github_user}.keys" | \
-                grep -E '^ssh-ed25519 [A-Za-z0-9+/]+=* ' | \
+                grep -E '^ssh-ed25519 [A-Za-z0-9+/]+=*' | \
                 head -n 1)
     # Validate it's a proper SSH key format
     if echo "$GITHUB_KEY" | ssh-keygen -lf - &>/dev/null; then
