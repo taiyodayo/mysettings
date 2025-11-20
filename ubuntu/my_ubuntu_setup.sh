@@ -21,6 +21,9 @@ fi
 # apt - 全体でよく使うパッケージ
 apt-get install -y zsh avahi-daemon parallel wireguard-tools nkf iftop iotop rclone lm-sensors
 
+# タイムゾーンを東京に設定
+sudo timedatectl set-timezone Asia/Tokyo
+
 # Homebrew
 NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
@@ -28,16 +31,19 @@ NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Ho
 echo "vm.swappiness=10" | tee -a /etc/sysctl.conf
 sysctl -p
 
-# docker-ce の部
-apt-get install -y apt-transport-https ca-certificates curl software-properties-common
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-apt update
-apt-cache policy docker-ce
-apt-get install -y docker-ce
-# sudo systemctl status docker
-# docker-compose を使わないと mailab のコンテナと互換性が無いのに注意 `docker compose` への対応は先送り中
-apt-get install -y docker-compose
+# # docker-ce の部
+# apt-get install -y apt-transport-https ca-certificates curl software-properties-common
+# curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+# echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+# apt update
+# apt-cache policy docker-ce
+# apt-get install -y docker-ce
+# # sudo systemctl status docker
+# # docker-compose を使わないと mailab のコンテナと互換性が無いのに注意 `docker compose` への対応は先送り中
+# apt-get install -y docker-compose
+
+sudo apt-get install -y docker.io docker-compose-plugin
+
 # ユーザを docker グループに追加
 usermod -aG docker "${SUDO_USER}"
 # # デフォルトのインセキュアレジストリを追加
