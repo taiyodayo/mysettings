@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Install zsh if not present (this is for debian/ubuntu systems. macOS has zsh by default.)
-if ! command -v zsh >/dev/null 2>&1; then
-    echo "Installing zsh..."
-    sudo apt-get update && sudo apt-get install -y zsh
+# Install prerequisites on Linux (Debian/Ubuntu only. macOS has zsh/git/curl by default.)
+if [[ "$(uname -s)" == "Linux" ]]; then
+    if [[ ! -f /etc/debian_version ]]; then
+        echo "ERROR: This script only supports Debian/Ubuntu variants on Linux."
+        echo "RedHat/CentOS/Rocky and other distributions are not supported."
+        exit 1
+    fi
+    echo "Installing git, curl, zsh..."
+    sudo apt-get update && sudo apt-get install -y git curl zsh
 fi
 echo "Use zsh as default shell:"
 chsh -s "$(which zsh)"
