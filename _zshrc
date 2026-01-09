@@ -22,9 +22,6 @@ if command -v direnv >/dev/null 2>&1; then
     eval "$(direnv hook zsh)"
 fi
 
-# Zinit install will fail if there is git is not installed (ubuntu-desktop default etc). Installing git if not found.
-# MacOS with Xcode should have git installed by default, but will try if apt fails.
-which git > /dev/null || (echo "installing git" && sudo apt-get install git || brew install git)
 ### Added by Zinit's installer
 if [[ ! -f $HOME/.zinit/bin/zinit.zsh ]]; then
     print -P "%F{33}▓▒░ %F{220}Installing %F{33}DHARMA%F{220} Initiative Plugin Manager (%F{33}zdharma/zinit%F{220})…%f"
@@ -33,21 +30,25 @@ if [[ ! -f $HOME/.zinit/bin/zinit.zsh ]]; then
         print -P "%F{33}▓▒░ %F{34}Installation successful.%f%b" || \
         print -P "%F{160}▓▒░ The clone has failed.%f%b"
 fi
-source "$HOME/.zinit/bin/zinit.zsh"
-autoload -Uz _zinit
-(( ${+_comps} )) && _comps[zinit]=_zinit
-# Load a few important annexes, without Turbo
-# (this is currently required for annexes)
-zinit light-mode for \
-    zdharma-continuum/z-a-rust \
-    zdharma-continuum/z-a-as-monitor \
-    zdharma-continuum/z-a-patch-dl \
-    zdharma-continuum/z-a-bin-gem-node
-### End of Zinit's installer chunk
-# Two regular plugins loaded without tracking.
-zinit light zsh-users/zsh-autosuggestions
-zinit light zdharma-continuum/fast-syntax-highlighting
-zinit ice depth=1; zinit light romkatv/powerlevel10k
+if [[ -f "$HOME/.zinit/bin/zinit.zsh" ]]; then
+    source "$HOME/.zinit/bin/zinit.zsh"
+    autoload -Uz _zinit
+    (( ${+_comps} )) && _comps[zinit]=_zinit
+    # Load a few important annexes, without Turbo
+    # (this is currently required for annexes)
+    zinit light-mode for \
+        zdharma-continuum/z-a-rust \
+        zdharma-continuum/z-a-as-monitor \
+        zdharma-continuum/z-a-patch-dl \
+        zdharma-continuum/z-a-bin-gem-node
+    ### End of Zinit's installer chunk
+    # Two regular plugins loaded without tracking.
+    zinit light zsh-users/zsh-autosuggestions
+    zinit light zdharma-continuum/fast-syntax-highlighting
+    zinit ice depth=1; zinit light romkatv/powerlevel10k
+else
+    print -P "%F{160}▓▒░ Zinit not found. Run setup script or install manually.%f%b"
+fi
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
@@ -71,8 +72,12 @@ if [ -f ~/.zlocal ]; then
   source ~/.zlocal
 fi
 
-## Colorize the ls output ##
-alias ls='ls --color=auto'
+## Colorize the ls output (GNU ls vs BSD ls)
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    alias ls='ls -G'
+else
+    alias ls='ls --color=auto'
+fi
 
 # 実行ユーザの uid/gid でコンテナを実行
 export local_uid=$(id -u)
