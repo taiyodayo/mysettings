@@ -104,10 +104,9 @@ if [ -n "$TARGET_USER" ]; then
   echo "Running as $TARGET_USER"
 
   if [ -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
-    # linuxbrew toolchain (kept for tooling; compilers remain apt-managed)
+    # Linuxbrew for user tooling only; build tooling stays apt-managed.
     eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-    brew install volta uv
-    volta install node
+    brew install bun uv
   fi
 
   # git のデフォルト
