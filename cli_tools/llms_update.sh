@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if ! command -v bun >/dev/null 2>&1; then
+  echo "bun is required for this script."
+  exit 1
+fi
+
 # Function to handle the version check and update logic
 update_tool() {
     local CMD_NAME=$1       # The command you type (e.g., gemini)
     local PACKAGE_NAME=$2   # The npm/bun package name (e.g., @google/gemini-cli)
+    local OLD_VER
+    local NEW_VER
+    local UPDATE_LOG
 
     # Print processing status (will be overwritten later)
     echo -n "Processing $CMD_NAME... "

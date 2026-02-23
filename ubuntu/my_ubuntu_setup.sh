@@ -1,8 +1,15 @@
 #!/usr/bin/env bash
 # ubuntu サーバを共通でセットアップします
+set -euo pipefail
+
 if [[ $EUID -ne 0 ]]; then
-   echo "This script must be run as root"
-   exit 1
+  echo "This script must be run as root"
+  exit 1
+fi
+
+TARGET_USER="${SUDO_USER:-}"
+if [ -z "$TARGET_USER" ] || [ "$TARGET_USER" = "root" ]; then
+  TARGET_USER=""
 fi
 
 echo "--- mailab ubuntu server kitting script ---"
@@ -12,17 +19,17 @@ read -r -n 1 -s key
 # Check the value of the key
 if [ "$key" = "" ]; then
     echo "Continuing..."
-    # Put the rest of your script here
 else
     echo "Exiting..."
     exit 0
 fi
 
 # apt - 全体でよく使うパッケージ
+apt-get update
 apt-get install -y zsh avahi-daemon parallel wireguard-tools nkf iftop iotop rclone lm-sensors
 
 # タイムゾーンを東京に設定
-sudo timedatectl set-timezone Asia/Tokyo
+timedatectl set-timezone Asia/Tokyo
 
 # Homebrew
 NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
@@ -31,43 +38,32 @@ NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Ho
 echo "vm.swappiness=10" | tee -a /etc/sysctl.conf
 sysctl -p
 
-# # docker-ce の部
-# apt-get install -y apt-transport-https ca-certificates curl software-properties-common
-# curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-# echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-# apt update
-# apt-cache policy docker-ce
-# apt-get install -y docker-ce
-# # sudo systemctl status docker
-# # docker-compose を使わないと mailab のコンテナと互換性が無いのに注意 `docker compose` への対応は先送り中
-# apt-get install -y docker-compose
-
 sudo apt-get install -y docker.io docker-compose-plugin
 
 # ユーザを docker グループに追加
-usermod -aG docker "${SUDO_USER}"
-# # デフォルトのインセキュアレジストリを追加
-# if [ ! -f /etc/docker/daemon.json ]; then
-#   echo '{"insecure-registries" : ["rx-7.local:5000", "7.mai:5000"]}' | sudo tee /etc/docker/daemon.json
-# fi
-# boomer.local / boomer.mai は ssl を使用するようになった。
-# 必要なルート証明書をコピー
-cp "/home/${SUDO_USER}/mysettings/certs/mailab_root_ca.crt" /usr/local/share/ca-certificates
+if [ -n "$TARGET_USER" ]; then
+  usermod -aG docker "$TARGET_USER"
+fi
+
+# # 必要なルート証明書をコピー
+if [ -n "$TARGET_USER" ]; then
+  CERT_SRC="/home/${TARGET_USER}/mysettings/certs/mailab_root_ca.crt"
+  if [ -f "$CERT_SRC" ]; then
+    cp "$CERT_SRC" /usr/local/share/ca-certificates
+  else
+    echo "Certificate not found: $CERT_SRC"
+  fi
+fi
 # 証明書を更新
 update-ca-certificates
 # docker をリスタート
 systemctl restart docker
 
 # netdata
-# aptでいれるのが一番早い。war roomへのノード追加はライセンス移行により辞めたほうが良くなった。
 apt-get install -y netdata
 
 # R の部
-# ubuntu に tidyverse で必要なパッケージ
-# キーを追加
-apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E084DAB9
-# update indices
-apt update -qq
+# aptでいれるのが一番早い。war roomへのノード追加はライセンス移行により辞めたほうが良くなった。
 # install two helper packages we need
 apt install -y --no-install-recommends software-properties-common dirmngr
 # add the signing key (by Michael Rutter) for these repos
@@ -90,9 +86,16 @@ Rscript -e 'pacman::p_load(tidyverse, lubridate, stringr, languageserver, httpgd
 # misc/datatools でよく使うパッケージ
 # homebrew - ghostscript9, imagemagick7 via imei
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-(echo; echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"') >> /home/taiyo/.zprofile
-eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-sudo -u taiyo brew intall gcc
+
+if [ -n "$TARGET_USER" ]; then
+  TARGET_HOME="/home/${TARGET_USER}"
+  (echo; echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"') >> "${TARGET_HOME}/.zprofile"
+  if [ -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+    /home/linuxbrew/.linuxbrew/bin/brew install gcc
+  fi
+fi
+
 # gs 10はPDF処理にバグがあって使用できない！！ (使うと日本語文字が散発的に化ける) gs9.55を指定してインストール
 apt-get install -y ghostscript=9.55.0~dfsg1-0ubuntu5.4 qpdf mupdf
 # gs9.55 を使用するため、ソースからIM7をビルド
@@ -103,35 +106,36 @@ t=$(mktemp) && \
 
 
 ### ここからユーザランド ###
-# here-document としてコマンドを列記
-sudo -u "$SUDO_USER" zsh << 'EOF'
-echo "Running as $SUDO_USER"
+if [ -n "$TARGET_USER" ]; then
+  # here-document としてコマンドを列記
+  sudo -u "$TARGET_USER" TARGET_USER="$TARGET_USER" zsh << 'EOF'
+  echo "Running as $TARGET_USER"
 
-# ubuntu でも homebrew は便利
-NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  # ubuntu でも homebrew は便利
+  NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-# node / volta
-brew install volta
-volta install node
+  # node / volta
+  brew install volta
+  volta install node
 
-# python / uv
-brew install uv
+  # python / uv
+  brew install uv
 
-# git のデフォルト
-git config --global user.name "taiyo@$(hostname) default"
-git config --global user.email "taiyodayo@gmail.com"
+  # git のデフォルト
+  git config --global user.name "${TARGET_USER}@$(hostname) default"
+  git config --global user.email "taiyodayo@gmail.com"
 
-# netdata
-# wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && \
-#  sh /tmp/netdata-kickstart.sh --stable-channel \
-#    --claim-token xzdZDjRWCEdPau82Yt8xmcrvddTA01uUY4DLPpfQRDEbuGJJLMMhn8vG7uf3GmA4GLbr1Ce8dXyqyLHufGaZFHY72p1QAP3lm8ehJ_konTWhcgtlqB2bqhkGfhl5jK-eQl14Xb8 \
-#    --claim-rooms 897e56af-6d74-438a-888f-12c38a879e7f \
-#    --claim-url https://app.netdata.cloud
+  # netdata
+  # wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && \
+  #  sh /tmp/netdata-kickstart.sh --stable-channel \
+  #    --claim-token xzdZDjRWCEdPau82Yt8xmcrvddTA01uUY4DLPpfQRDEbuGJJLMMhn8vG7uf3GmA4GLbr1Ce8dXyqyLHufGaZFHY72p1QAP3lm8ehJ_konTWhcgtlqB2bqhkGfhl5jK-eQl14Xb8 \
+  #    --claim-rooms 897e56af-6d74-438a-888f-12c38a879e7f \
+  #    --claim-url https://app.netdata.cloud
 
-# taiyo 実行ここまで
+  # taiyo 実行ここまで
 EOF
+fi
 
 echo "Running as root"
 # 最後の通知
 echo "Kitting completed. please logout to activate changes"
-#[EOF]

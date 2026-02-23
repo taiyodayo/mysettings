@@ -15,8 +15,10 @@ brew install libgit2 libsodium libtiff cmake libxml2 openssl curl harfbuzz fribi
 brew install --cask r
 
 # Set up .Rprofile only if not already configured
-if [ ! -f ~/.Rprofile ] || ! grep -q "cloud.r-project.org" ~/.Rprofile; then
+if [ ! -f ~/.Rprofile ]; then
     echo 'options(repos = c(CRAN = "https://cloud.r-project.org"))' > ~/.Rprofile
+elif ! grep -q "cloud.r-project.org" ~/.Rprofile; then
+    echo 'options(repos = c(CRAN = "https://cloud.r-project.org"))' >> ~/.Rprofile
 fi
 
 # Install R packages

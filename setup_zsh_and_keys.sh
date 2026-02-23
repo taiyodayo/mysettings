@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ZSH_PATH="$(command -v zsh)"
+
 # Install prerequisites on Linux (Debian/Ubuntu only. macOS has zsh/git/curl by default.)
 if [[ "$(uname -s)" == "Linux" ]]; then
     if [[ ! -f /etc/debian_version ]]; then
@@ -11,8 +14,14 @@ if [[ "$(uname -s)" == "Linux" ]]; then
     echo "Installing git, curl, zsh..."
     sudo apt-get update && sudo apt-get install -y git curl zsh
 fi
+
+if ! ZSH_PATH="$(command -v zsh)"; then
+  echo "zsh not found after setup."
+  exit 1
+fi
+
 echo "Use zsh as default shell:"
-chsh -s "$(which zsh)"
+chsh -s "$ZSH_PATH"
 
 # Backup .zshrc if it exists
 if [ -f ~/.zshrc ]; then
@@ -28,7 +37,7 @@ if [ -f ~/.zshrc ]; then
     fi
 fi
 # Copy new .zshrc
-cp -f _zshrc ~/.zshrc
+cp -f "$SCRIPT_DIR/_zshrc" ~/.zshrc
 echo "Copied new .zshrc"
 
 # Backup .p10k.zsh if it exists
@@ -38,7 +47,7 @@ if [ -f ~/.p10k.zsh ]; then
     echo "Backed up existing .p10k.zsh"
 fi
 # Copy new .p10k.zsh
-cp -f _p10k.zsh ~/.p10k.zsh
+cp -f "$SCRIPT_DIR/_p10k.zsh" ~/.p10k.zsh
 echo "Copied new .p10k.zsh"
 
 # Setup SSH directory
@@ -51,7 +60,7 @@ if [ -f ~/.ssh/authorized_keys ] && grep -q '^ssh-ed25519 ' ~/.ssh/authorized_ke
 else
     # Prompt for GitHub username and fetch SSH key
     while true; do
-        read -r -p "Enter GitHub username for ED25119 key retrieval: " github_user
+        read -r -p "Enter GitHub username for ED25519 key retrieval: " github_user
         # 1. Extract *only* alphanumeric chars and hyphens.
         github_user=${github_user//[^a-zA-Z0-9-]/}
         # 2. Truncate to GitHub's 39-character limit

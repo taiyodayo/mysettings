@@ -5,6 +5,10 @@ set -euo pipefail
 # -o pipefail: Exit if any command in a pipe fails
 
 BACKUP_FILE="$HOME/services_backup.txt"
+if [ "$(id -u)" -ne 0 ]; then
+  echo "Run as root."
+  exit 1
+fi
 
 echo "=== 1. SNAPSHOT SERVICE STATE ==="
 # Save currently enabled services.

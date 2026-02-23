@@ -1,4 +1,11 @@
 #!/bin/bash
+set -euo pipefail
+
+if [ "$(id -u)" -ne 0 ]; then
+  echo "Run as root."
+  exit 1
+fi
+
 # Script to customize Ubuntu SSH login message (MOTD)
 
 echo "Customizing SSH login message..."

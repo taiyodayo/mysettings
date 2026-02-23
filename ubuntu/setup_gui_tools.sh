@@ -1,27 +1,36 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-# Basics
-sudo apt install fonts-firacode
+if ! command -v apt-get >/dev/null 2>&1; then
+  echo "This script requires apt."
+  exit 1
+fi
+
+sudo apt-get update
+sudo apt-get install -y fonts-firacode software-properties-common wget gpg
 
 # Android-Studio
 ## Install Java JDK (if not already installed)
-sudo apt install openjdk-11-jdk
+sudo apt-get install -y openjdk-11-jdk
 ## Add the Android Studio repository
-sudo add-apt-repository ppa:maarten-fonville/android-studio
+sudo add-apt-repository -y ppa:maarten-fonville/android-studio
 ## Update package list
-sudo apt update
+sudo apt-get update
 ## Install Android Studio
-sudo apt install android-studio
+sudo apt-get install -y android-studio
 
-# fvm / flutter
-brew tap leoafarias/fvm
-brew install fvm
-##
-fvm install stable
-fvm global stable
+if command -v brew >/dev/null 2>&1; then
+  # fvm / flutter
+  brew tap leoafarias/fvm
+  brew install fvm
+  fvm install stable
+  fvm global stable
+else
+  echo "brew not found. Skipping fvm/flutter install."
+fi
 
 # Google Chrome
-wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmour -o /usr/share/keyrings/google-chrome-keyring.gpg
+sudo wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmour -o /usr/share/keyrings/google-chrome-keyring.gpg
 echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
-sudo apt update
-sudo apt install google-chrome-stable
+sudo apt-get update
+sudo apt-get install -y google-chrome-stable

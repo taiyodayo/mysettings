@@ -1,5 +1,9 @@
 #!/bin/bash
 set -euo pipefail
+if [ "$(id -u)" -ne 0 ]; then
+  echo "Run as root."
+  exit 1
+fi
 
 echo "=== PRE-REBOOT SAFETY AUDIT ==="
 FAILURES=0

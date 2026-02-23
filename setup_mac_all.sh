@@ -38,20 +38,22 @@ echo ""
 mkdir -p ~/dev
 
 # zsh周りの基本設定
-source ./setup_zsh_and_keys.sh
+source "${SCRIPT_DIR}/setup_zsh_and_keys.sh"
 
 # homebrew 他を設定
-source ./mac/setup_cli_tools.sh
+source "${SCRIPT_DIR}/mac/setup_cli_tools.sh"
 
 # iterm他を設定
-source ./mac/setup_gui_apps.sh
+source "${SCRIPT_DIR}/mac/setup_gui_apps.sh"
 
 # iterm2 を開いておく
 echo "iTerm2 を開きます。 以後はシステム内蔵でなくこちらを使用します"
-open -a iTerm
+if [ -d "/Applications/iTerm.app" ]; then
+  open -a iTerm
+fi
 
 # R などデータサイエンス用パッケージを設定
-source ./mac/brew_tidyverse.sh
+source "${SCRIPT_DIR}/mac/brew_tidyverse.sh"
 
 # 開発アプリ Xcode, android studio など
 echo "開発者向けポストインストールメモをブラウザで開きます"
@@ -59,14 +61,20 @@ open "https://github.com/taiyodayo/mysettings/blob/main/mac/postinstall_note.md"
 
 echo "開発用アプリを開きます。ログイン、SDK Managerのセットアップを行ってください"
 # Android Studio の初回起動と SDK Manager 表示
-open -a "Android Studio"
-osascript -e 'tell application id "com.google.android.studio" to activate' \
-          -e 'delay 0.3' \
-          -e 'tell application "System Events" to tell (first process whose bundle identifier is "com.google.android.studio") to click menu item "SDK Manager" of menu "Tools" of menu bar 1'
+if [ -d "/Applications/Android Studio.app" ]; then
+  open -a "Android Studio"
+  osascript -e 'tell application id "com.google.android.studio" to activate' \
+            -e 'delay 0.3' \
+            -e 'tell application "System Events" to tell (first process whose bundle identifier is "com.google.android.studio") to click menu item "SDK Manager" of menu "Tools" of menu bar 1'
+fi
 
 # xcode のインストール完了を待って、起動
 echo "Xcode のインストールを待っています。完了したら、Xcode を起動します"
-wait $install_pid
+if [ -n "${install_pid-}" ]; then
+  wait "$install_pid"
+else
+  echo "mas install pid was not set. Please run Xcode setup manually if needed."
+fi
 # ここ、コマンドで処理してしまうと、Xcode の初回起動時のダイアログが出ない
 # iOS 開発に必要なシミュレータなどコンポーネントのインストールも走らないので、open で起動して手動操作を促す
 # sleep 10
@@ -74,7 +82,9 @@ wait $install_pid
 # sudo xcodebuild -license accept      # Accepts license, no prompt
 # sudo xcodebuild -runFirstLaunch      # Runs first launch tasks, no prompt
 # sleep 5
-open -a Xcode
+if [ -d "/Applications/Xcode.app" ]; then
+  open -a Xcode
+fi
 
 flutter doctor
 
