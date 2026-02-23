@@ -24,7 +24,7 @@ if ! command -v apt-get >/dev/null 2>&1; then
 fi
 
 sudo apt-get update
-sudo apt-get install -y fonts-firacode software-properties-common wget gpg
+sudo apt-get install -y software-properties-common wget gpg
 
 # Android-Studio
 ## Install Java JDK (if not already installed)

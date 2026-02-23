@@ -26,7 +26,7 @@ fi
 
 # apt - 全体でよく使うパッケージ
 apt-get update
-apt-get install -y zsh avahi-daemon parallel wireguard-tools nkf iftop iotop rclone lm-sensors
+apt-get install -y zsh avahi-daemon parallel wireguard-tools nkf iftop iotop rclone lm-sensors fonts-firacode
 
 # タイムゾーンを東京に設定
 timedatectl set-timezone Asia/Tokyo
