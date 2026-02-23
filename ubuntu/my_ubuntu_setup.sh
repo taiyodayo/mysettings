@@ -26,13 +26,10 @@ fi
 
 # apt - 全体でよく使うパッケージ
 apt-get update
-apt-get install -y zsh avahi-daemon parallel wireguard-tools nkf iftop iotop rclone lm-sensors fonts-firacode
+apt-get install -y zsh avahi-daemon parallel wireguard-tools nkf iftop iotop rclone lm-sensors fonts-firacode build-essential
 
 # タイムゾーンを東京に設定
 timedatectl set-timezone Asia/Tokyo
-
-# Homebrew
-NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
 # カーネルパラメータを調整 - これしないとビッグデータ・webスクレープ系のワークロードが不安定になることがある
 echo "vm.swappiness=10" | tee -a /etc/sysctl.conf
@@ -84,16 +81,11 @@ Rscript -e 'install.packages("pacman")'
 Rscript -e 'pacman::p_load(tidyverse, lubridate, stringr, languageserver, httpgd)'
 
 # misc/datatools でよく使うパッケージ
-# homebrew - ghostscript9, imagemagick7 via imei
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-if [ -n "$TARGET_USER" ]; then
+if [ "${WITH_LINUX_BREW:-1}" = "1" ] && [ -n "$TARGET_USER" ]; then
+  # homebrew - ghostscript9, imagemagick7 via imei
+  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
   TARGET_HOME="/home/${TARGET_USER}"
   (echo; echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"') >> "${TARGET_HOME}/.zprofile"
-  if [ -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
-    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-    /home/linuxbrew/.linuxbrew/bin/brew install gcc
-  fi
 fi
 
 # gs 10はPDF処理にバグがあって使用できない！！ (使うと日本語文字が散発的に化ける) gs9.55を指定してインストール
@@ -111,15 +103,12 @@ if [ -n "$TARGET_USER" ]; then
   sudo -u "$TARGET_USER" TARGET_USER="$TARGET_USER" zsh << 'EOF'
   echo "Running as $TARGET_USER"
 
-  # ubuntu でも homebrew は便利
-  NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-  # node / volta
-  brew install volta
-  volta install node
-
-  # python / uv
-  brew install uv
+  if [ -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
+    # linuxbrew toolchain (kept for tooling; compilers remain apt-managed)
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+    brew install volta uv
+    volta install node
+  fi
 
   # git のデフォルト
   git config --global user.name "${TARGET_USER}@$(hostname) default"

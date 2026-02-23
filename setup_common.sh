@@ -21,6 +21,7 @@ mode:
   server   Ubuntu-only: run server setup (requires root)
   all      macOS: same as default
           Ubuntu: CLI/server setup first, then optional GUI tools (requires root)
+          Ubuntu: set WITH_LINUX_BREW=0 to skip Linuxbrew in server flow
 USAGE
 }
 
