@@ -1,6 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+has_gui() {
+  if [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; then
+    return 0
+  fi
+
+  [ -S /tmp/.X11-unix/X0 ] || [ -S /tmp/.X11-unix/X1 ] && return 0
+
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl --quiet is-active graphical.target 2>/dev/null
+  fi
+}
+
+if ! has_gui; then
+  echo "No GUI environment detected. Skipping Ubuntu GUI tools."
+  exit 0
+fi
+
 if ! command -v apt-get >/dev/null 2>&1; then
   echo "This script requires apt."
   exit 1
