@@ -136,8 +136,11 @@ source "$HOME/p313/bin/activate"
 uv pip install polars pandas numpy requests pyarrow scikit-learn jupyter
 
 # Add custom CLI tools directory to PATH
-# shellcheck disable=SC2016
-echo 'export PATH="$HOME/mysettings/cli_tools:$PATH"' >> ~/.zshrc
+if [ ! -f ~/.zshrc ] || ! grep -Fq 'mysettings/cli_tools' ~/.zshrc; then
+  # shellcheck disable=SC2016
+  echo 'export PATH="$HOME/mysettings/cli_tools:$PATH"' >> ~/.zshrc
+fi
+export PATH="$HOME/mysettings/cli_tools:$PATH"
 
 # Display messages
 echo "=========================================="

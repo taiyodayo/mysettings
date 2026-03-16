@@ -135,6 +135,12 @@ git config --global user.email "taiyodayo@gmail.com"
 #    --claim-rooms 897e56af-6d74-438a-888f-12c38a879e7f \
 #    --claim-url https://app.netdata.cloud
 
+# Add custom CLI tools directory to PATH
+if [ ! -f ~/.zshrc ] || ! grep -Fq 'mysettings/cli_tools' ~/.zshrc; then
+  echo 'export PATH="$HOME/mysettings/cli_tools:$PATH"' >> ~/.zshrc
+fi
+export PATH="$HOME/mysettings/cli_tools:$PATH"
+
 # taiyo 実行ここまで
 EOF
 
