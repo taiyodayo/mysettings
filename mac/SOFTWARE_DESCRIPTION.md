@@ -20,9 +20,9 @@ https://brew.sh
 Manages multiple Flutter SDK versions for different projects.
 https://fvm.app
 
-### Volta
-Hassle-free JavaScript tool manager - automatically switches Node.js versions per project.
-https://volta.sh
+### mise
+Unified dev tool version manager - automatically switches Node.js, Python, and other runtimes per project.
+https://mise.jdx.dev
 
 ### uv
 An extremely fast Python package installer and resolver.

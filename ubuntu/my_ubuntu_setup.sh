@@ -110,9 +110,16 @@ echo "Running as $SUDO_USER"
 # ubuntu でも homebrew は便利
 NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-# node / volta
-brew install volta
-volta install node
+# node / mise - nvm や volta より遥かに便利 (Much more convenient than nvm/volta)
+brew install mise
+eval "$(mise activate zsh)"
+if [ ! -f ~/.zshrc ] || ! grep -Fq 'mise activate zsh' ~/.zshrc; then
+  cat >> ~/.zshrc <<-'EOM'
+# mise
+eval "$(mise activate zsh)"
+EOM
+fi
+mise use --global node@lts
 
 # python / uv
 brew install uv

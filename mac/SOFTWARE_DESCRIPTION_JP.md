@@ -20,9 +20,9 @@ https://brew.sh
 プロジェクトごとに異なるFlutter SDKバージョンを管理できるツール。
 https://fvm.app
 
-### Volta
-プロジェクトごとに自動でNode.jsバージョンを切り替えてくれる、使いやすいJavaScriptツールマネージャー。
-https://volta.sh
+### mise
+開発ツールのバージョン管理を一元化。Node.js、Python等のランタイムをプロジェクトごとに自動切り替え。
+https://mise.jdx.dev
 
 ### uv
 非常に高速なPythonパッケージインストーラー。

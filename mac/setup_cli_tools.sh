@@ -105,21 +105,19 @@ if [ ! -f ~/.zshrc ] || ! grep -Fq 'Android/sdk/platform-tools' ~/.zshrc; then
 	EOM
 fi
 
-# Volta for Node.js - 自動アクティベーション等、nvm より遥かに便利
-brew install volta
-# Initialize volta for this session
-export VOLTA_HOME="$HOME/.volta"
-export PATH="$VOLTA_HOME/bin:$PATH"
-# Add Volta to PATH in ~/.zshrc if not already there
-if [ ! -f ~/.zshrc ] || ! grep -Fq 'export VOLTA_HOME=' ~/.zshrc; then
-	cat >> ~/.zshrc <<-'EOM'
-		# Volta
-		export VOLTA_HOME="$HOME/.volta"
-		export PATH="$VOLTA_HOME/bin:$PATH"
-	EOM
+# mise - 自動アクティベーション等、nvm や volta より遥かに便利 (Much more convenient than nvm/volta)
+brew install mise
+# Initialize mise for this current session so the next commands work immediately
+eval "$(mise activate zsh)"
+# Add mise to ~/.zshrc if not already there
+if [ ! -f ~/.zshrc ] || ! grep -Fq 'mise activate zsh' ~/.zshrc; then
+  cat >> ~/.zshrc <<-'EOM'
+# mise
+eval "$(mise activate zsh)"
+EOM
 fi
-# Install node lts
-volta install node@lts
+# Install Node.js LTS and set it as your global default
+mise use --global node@lts
 
 # uv for Python
 brew install uv
