@@ -22,13 +22,12 @@ fi
 apt-get install -y zsh avahi-daemon parallel wireguard-tools nkf iftop iotop rclone lm-sensors
 
 # タイムゾーンを東京に設定
-sudo timedatectl set-timezone Asia/Tokyo
-
-# Homebrew
-NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+timedatectl set-timezone Asia/Tokyo
 
 # カーネルパラメータを調整 - これしないとビッグデータ・webスクレープ系のワークロードが不安定になることがある
-echo "vm.swappiness=10" | tee -a /etc/sysctl.conf
+if ! grep -qF 'vm.swappiness=10' /etc/sysctl.conf 2>/dev/null; then
+    echo "vm.swappiness=10" | tee -a /etc/sysctl.conf
+fi
 sysctl -p
 
 # # docker-ce の部
@@ -42,7 +41,7 @@ sysctl -p
 # # docker-compose を使わないと mailab のコンテナと互換性が無いのに注意 `docker compose` への対応は先送り中
 # apt-get install -y docker-compose
 
-sudo apt-get install -y docker.io docker-compose-plugin
+apt-get install -y docker.io docker-compose-plugin
 
 # ユーザを docker グループに追加
 usermod -aG docker "${SUDO_USER}"
@@ -88,11 +87,7 @@ Rscript -e 'install.packages("pacman")'
 Rscript -e 'pacman::p_load(tidyverse, lubridate, stringr, languageserver, httpgd)'
 
 # misc/datatools でよく使うパッケージ
-# homebrew - ghostscript9, imagemagick7 via imei
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-(echo; echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"') >> /home/taiyo/.zprofile
-eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-sudo -u taiyo brew intall gcc
+# ghostscript9, imagemagick7 via imei
 # gs 10はPDF処理にバグがあって使用できない！！ (使うと日本語文字が散発的に化ける) gs9.55を指定してインストール
 apt-get install -y ghostscript=9.55.0~dfsg1-0ubuntu5.4 qpdf mupdf
 # gs9.55 を使用するため、ソースからIM7をビルド
@@ -107,8 +102,14 @@ t=$(mktemp) && \
 sudo -u "$SUDO_USER" zsh << 'EOF'
 echo "Running as $SUDO_USER"
 
-# ubuntu でも homebrew は便利
+# Homebrew (ユーザランドでインストール - root では動かない)
 NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+# Add brew to shell profile if not already there
+if ! grep -Fq 'linuxbrew' ~/.zprofile 2>/dev/null; then
+  echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.zprofile
+fi
+brew install gcc
 
 # node / mise - nvm や volta より遥かに便利 (Much more convenient than nvm/volta)
 brew install mise
