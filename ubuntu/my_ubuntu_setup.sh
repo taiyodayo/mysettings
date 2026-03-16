@@ -19,7 +19,14 @@ else
 fi
 
 # apt - 全体でよく使うパッケージ
-apt-get install -y zsh avahi-daemon parallel wireguard-tools nkf iftop iotop rclone lm-sensors
+apt-get install -y zsh avahi-daemon parallel wireguard-tools nkf iftop iotop rclone lm-sensors \
+  build-essential
+
+# mise (公式 apt リポジトリ - brew より apt が推奨)
+apt-get install -y gpg
+curl -fsSL https://mise.jdx.dev/gpg-key.pub | gpg --dearmor -o /etc/apt/keyrings/mise-archive-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=amd64] https://mise.jdx.dev/deb stable main" | tee /etc/apt/sources.list.d/mise.list
+apt-get update && apt-get install -y mise
 
 # タイムゾーンを東京に設定
 timedatectl set-timezone Asia/Tokyo
@@ -102,17 +109,15 @@ t=$(mktemp) && \
 sudo -u "$SUDO_USER" zsh << 'EOF'
 echo "Running as $SUDO_USER"
 
-# Homebrew (ユーザランドでインストール - root では動かない)
+# Homebrew (ユーザランドでインストール - root では動かない。補助的に使用)
 NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 # Add brew to shell profile if not already there
 if ! grep -Fq 'linuxbrew' ~/.zprofile 2>/dev/null; then
   echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.zprofile
 fi
-brew install gcc
 
-# node / mise - nvm や volta より遥かに便利 (Much more convenient than nvm/volta)
-brew install mise
+# node / mise (apt で root セクションにてインストール済み)
 eval "$(mise activate zsh)"
 if [ ! -f ~/.zshrc ] || ! grep -Fq 'mise activate zsh' ~/.zshrc; then
   cat >> ~/.zshrc <<-'EOM'
@@ -122,8 +127,10 @@ EOM
 fi
 mise use --global node@lts
 
-# python / uv
-brew install uv
+# uv for Python (公式インストーラー - self-update 対応)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# installer adds ~/.local/bin to PATH via shell profile; activate for this session
+export PATH="$HOME/.local/bin:$PATH"
 
 # git のデフォルト
 git config --global user.name "taiyo@$(hostname) default"
