@@ -37,7 +37,8 @@ get_version() {
 }
 
 # Update Claude Code via the native installer (https://claude.ai/install.sh).
-# Migrates any existing bun/npm global install to native, then self-updates.
+# Always purges any bun/npm/volta global install of @anthropic-ai/claude-code
+# (even if a native install is already first in PATH), then installs/self-updates.
 update_claude_native() {
     local CMD_NAME="claude"
     local NATIVE_PATH="$HOME/.local/bin/claude"
@@ -47,34 +48,52 @@ update_claude_native() {
     local OLD_VER
     OLD_VER=$(get_version "$CMD_NAME")
 
-    # Detect whether the current install is the native one at ~/.local/bin/claude.
-    local IS_NATIVE=false
-    if [ "$OLD_VER" != "Not Installed" ]; then
-        local CUR_PATH
-        CUR_PATH=$(command -v "$CMD_NAME")
-        if [ "$CUR_PATH" = "$NATIVE_PATH" ]; then
-            IS_NATIVE=true
-        fi
-    fi
-
-    # If a non-native (bun/npm) install is present, remove it before installing native.
-    if [ "$OLD_VER" != "Not Installed" ] && [ "$IS_NATIVE" = false ]; then
-        echo ""
-        echo "  Detected non-native $CMD_NAME at $(command -v $CMD_NAME) — migrating to native."
+    # Purge residual non-native installs from known locations. Runs unconditionally
+    # because a native install may be first in PATH while bun/volta copies linger.
+    local CLEANED=""
+    # bun (~/.bun/bin/claude)
+    if [ -e "$HOME/.bun/bin/claude" ]; then
         if command -v bun &>/dev/null; then
             bun remove -g "$PKG" >/dev/null 2>&1 || true
         fi
-        if command -v npm &>/dev/null; then
-            npm uninstall -g "$PKG" >/dev/null 2>&1 || true
+        rm -f "$HOME/.bun/bin/claude"
+        CLEANED="$CLEANED bun"
+    fi
+    # volta (~/.volta/bin/claude shim)
+    if [ -e "$HOME/.volta/bin/claude" ]; then
+        if command -v volta &>/dev/null; then
+            volta uninstall "$PKG" >/dev/null 2>&1 \
+                || volta uninstall claude >/dev/null 2>&1 \
+                || true
         fi
-        hash -r
-        echo -n "  Installing $CMD_NAME via native installer... "
+        rm -f "$HOME/.volta/bin/claude"
+        CLEANED="$CLEANED volta"
+    fi
+    # npm global
+    if command -v npm &>/dev/null; then
+        local NPM_ROOT
+        NPM_ROOT=$(npm root -g 2>/dev/null || true)
+        if [ -n "$NPM_ROOT" ] && [ -d "$NPM_ROOT/@anthropic-ai/claude-code" ]; then
+            npm uninstall -g "$PKG" >/dev/null 2>&1 || true
+            CLEANED="$CLEANED npm"
+        fi
     fi
 
+    if [ -n "$CLEANED" ]; then
+        echo ""
+        echo "  Removed non-native $CMD_NAME from:$CLEANED"
+        hash -r
+        echo -n "  Finishing $CMD_NAME install/update... "
+    fi
+
+    # After cleanup, decide install vs update based on the native binary's presence.
+    local HAS_NATIVE=false
+    [ -x "$NATIVE_PATH" ] && HAS_NATIVE=true
+
     local UPDATE_LOG
-    if [ "$IS_NATIVE" = true ]; then
-        # Native install already present — let claude update itself.
-        if ! UPDATE_LOG=$("$CMD_NAME" update 2>&1); then
+    if [ "$HAS_NATIVE" = true ]; then
+        # Native install present — invoke it directly so we don't hit a stale shim.
+        if ! UPDATE_LOG=$("$NATIVE_PATH" update 2>&1); then
             echo ""
             echo "❌ $CMD_NAME - Critical Error: 'claude update' failed."
             echo "LOG OUTPUT:"
