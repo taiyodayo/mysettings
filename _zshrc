@@ -8,6 +8,9 @@ setopt extended_glob        # 拡張グロブを有効にする
 setopt glob_dots            # 隠しファイルをグロブに含める (bashのように)
 setopt no_beep              # うるさいビープ音を止める
 
+# ~/.local/bin holds the native Claude Code binary (and other user-installed tools)
+export PATH="$HOME/.local/bin:$PATH"
+
 # Initialize brew in current session (handles architecture automatically)
 # Bootstrap brew from install location
 for brew_path in /opt/homebrew/bin/brew /usr/local/bin/brew /home/linuxbrew/.linuxbrew/bin/brew; do

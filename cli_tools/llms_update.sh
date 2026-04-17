@@ -23,6 +23,32 @@ report_version_change() {
     fi
 }
 
+# Ensure ~/.local/bin is permanently on PATH for the user's interactive shells.
+# Idempotent: only appends to an rc file that doesn't already reference ~/.local/bin.
+# Needed because the native Claude installer places the binary there, but users
+# whose login shell PATH only has e.g. ~/.bun/bin will lose `claude` after we
+# purge the bun shim.
+ensure_local_bin_on_path() {
+    local LINE='export PATH="$HOME/.local/bin:$PATH"'
+    local MARK='# Added by llms_update.sh: ensure ~/.local/bin on PATH'
+    local rc modified=""
+    for rc in "$HOME/.zshrc" "$HOME/.bashrc"; do
+        [ -f "$rc" ] || continue
+        # Resolve symlinks so we report the real file being edited.
+        local target="$rc"
+        [ -L "$rc" ] && target=$(readlink -f "$rc" 2>/dev/null || echo "$rc")
+        if grep -qE '(\$HOME|\$\{HOME\}|~)/\.local/bin' "$target"; then
+            continue
+        fi
+        printf '\n%s\n%s\n' "$MARK" "$LINE" >> "$target"
+        modified="$modified $target"
+    done
+    if [ -n "$modified" ]; then
+        echo "  ⚠ ~/.local/bin was not on your shell PATH — added it to:$modified"
+        echo "    Open a new shell (or 'source' the file) for 'claude' to be found."
+    fi
+}
+
 # Read installed version, or return "Not Installed" / "Unknown"
 get_version() {
     local CMD_NAME=$1
@@ -124,6 +150,11 @@ update_claude_native() {
     fi
 
     report_version_change "$CMD_NAME" "$OLD_VER" "$NEW_VER"
+
+    # Having verified the native binary is in place, make sure the user's login
+    # shells can actually find it. This repairs machines where we just removed
+    # a bun/volta/npm shim that was the only thing putting `claude` on PATH.
+    ensure_local_bin_on_path
 }
 
 # Function to handle the version check and update logic
