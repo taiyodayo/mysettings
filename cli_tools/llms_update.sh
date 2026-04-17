@@ -85,7 +85,22 @@ update_claude_native() {
         rm -f "$HOME/.bun/bin/claude"
         CLEANED="$CLEANED bun"
     fi
-    # volta (~/.volta/bin/claude shim)
+    # volta — packages live under ~/.volta/tools/image/node/<ver>/bin/claude,
+    # with a shim at ~/.volta/bin/claude. Walk every installed node version and
+    # uninstall via that node's own npm so volta's active-toolchain logic
+    # doesn't get in the way. Then scrub any leftover binary.
+    local _vbin _vbindir _vnpm
+    for _vbin in "$HOME/.volta/tools/image/node/"*"/bin/claude"; do
+        [ -e "$_vbin" ] || continue
+        _vbindir="${_vbin%/claude}"
+        _vnpm="$_vbindir/npm"
+        if [ -x "$_vnpm" ]; then
+            PATH="$_vbindir:$PATH" "$_vnpm" uninstall -g "$PKG" >/dev/null 2>&1 || true
+        fi
+        rm -f "$_vbin"
+        case "$CLEANED" in *" volta"*) ;; *) CLEANED="$CLEANED volta" ;; esac
+    done
+    # volta shim (~/.volta/bin/claude) — may survive the above or exist alone
     if [ -e "$HOME/.volta/bin/claude" ]; then
         if command -v volta &>/dev/null; then
             volta uninstall "$PKG" >/dev/null 2>&1 \
@@ -93,12 +108,15 @@ update_claude_native() {
                 || true
         fi
         rm -f "$HOME/.volta/bin/claude"
-        CLEANED="$CLEANED volta"
+        case "$CLEANED" in *" volta"*) ;; *) CLEANED="$CLEANED volta" ;; esac
     fi
-    # npm global
+    # npm global (non-volta; volta-managed npm roots already handled above)
     if command -v npm &>/dev/null; then
         local NPM_ROOT
         NPM_ROOT=$(npm root -g 2>/dev/null || true)
+        case "$NPM_ROOT" in
+            "$HOME/.volta/tools/image/node/"*) NPM_ROOT="" ;;
+        esac
         if [ -n "$NPM_ROOT" ] && [ -d "$NPM_ROOT/@anthropic-ai/claude-code" ]; then
             npm uninstall -g "$PKG" >/dev/null 2>&1 || true
             CLEANED="$CLEANED npm"
