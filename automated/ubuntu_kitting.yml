@@ -31,10 +31,21 @@
       - gpg
       - software-properties-common
       - dirmngr
+    # R-DS preload. Lands in /usr/lib/R/site-library — every user sees
+    # these the moment they type `R`. Personal extras go to ~/R/...
+    # via install.packages() as usual (and via bspm if running as root
+    # or sudo, otherwise source compile).
     r_apt_packages:
       - r-cran-tidyverse
-      - r-cran-lubridate
-      - r-cran-stringr
+      - r-cran-pacman
+      - r-cran-data.table
+      - r-cran-arrow
+      - r-cran-jsonlite
+      - r-cran-readxl
+      - r-cran-rmarkdown
+      - r-cran-knitr
+      - r-cran-devtools
+      - r-cran-renv
       - r-cran-languageserver
       - r-cran-httpgd
     # gs 10 has a PDF mojibake bug for Japanese — pin to the patched 9.55 build.
@@ -207,20 +218,20 @@
               Pin: release o=CRAN-Apt Project
               Pin-Priority: 700
 
-        - name: Install r-base + bspm bridge dependencies
+        # ONE apt transaction: r-base + bspm + lab-DS preload. Splitting
+        # this into multiple installs lets a partial run leave R installed
+        # without bspm, which makes the next install.packages() / pacman::
+        # p_load() in any R session source-compile from CRAN.
+        - name: Install r-base + bspm + lab-DS preload (one transaction)
           ansible.builtin.apt:
-            name:
-              - r-base
-              - r-base-dev
-              - python3-dbus
-              - python3-gi
-              - python3-apt
-              - r-cran-bspm
+            name: "{{ ['r-base', 'r-base-dev',
+                       'python3-dbus', 'python3-gi', 'python3-apt',
+                       'r-cran-bspm'] + r_apt_packages }}"
             state: present
             install_recommends: false
             update_cache: true
 
-        - name: Enable bspm in Rprofile.site (binary install via apt)
+        - name: Enable bspm in Rprofile.site (apt-binary install.packages)
           ansible.builtin.blockinfile:
             path: /etc/R/Rprofile.site
             create: true
@@ -230,11 +241,15 @@
               suppressMessages(bspm::enable())
               options(bspm.version.check=FALSE)
 
-        - name: Install lab-wide R packages as binary debs
-          ansible.builtin.apt:
-            name: "{{ r_apt_packages }}"
-            state: present
-            install_recommends: false
+        - name: Verify R install (bspm + preloaded packages)
+          ansible.builtin.command: "{{ mysettings_repo_dir }}/cli_tools/check_r.sh"
+          register: r_check
+          changed_when: false
+          failed_when: r_check.rc != 0
+
+        - name: Show R check output
+          ansible.builtin.debug:
+            var: r_check.stdout_lines
 
     # ---- pinned ghostscript + IMEI builds ImageMagick 7 against it ----
 

@@ -93,18 +93,28 @@ Pin: release o=CRAN-Apt Project
 Pin-Priority: 700
 PIN
     apt-get update
-    apt-get install -y --no-install-recommends r-base r-base-dev
-    # bspm = Bridge to System Package Manager. After enabling, install.packages()
-    # in R uses apt under the hood, so any tooling that calls install.packages()
-    # (Rscript, RStudio, languageserver) also gets binary debs.
-    apt-get install -y python3-dbus python3-gi python3-apt
-    apt-get install -y --no-install-recommends r-cran-bspm
+    # ONE apt transaction: r-base + bspm + the lab's R-DS preload.
+    # Packages land in /usr/lib/R/site-library — visible to every user
+    # the moment they type `R`. Personal extras go to each user's
+    # ~/R/x86_64-pc-linux-gnu-library/ via install.packages() as usual.
+    apt-get install -y --no-install-recommends \
+      r-base r-base-dev \
+      python3-dbus python3-gi python3-apt r-cran-bspm \
+      r-cran-tidyverse r-cran-pacman r-cran-data.table \
+      r-cran-arrow r-cran-jsonlite r-cran-readxl \
+      r-cran-rmarkdown r-cran-knitr r-cran-devtools \
+      r-cran-renv r-cran-languageserver r-cran-httpgd
+    # Enable bspm globally so install.packages() / pacman::p_load() in any
+    # later R session also resolve to apt binaries (RStudio install button,
+    # Rscript pipelines, languageserver completions, etc.).
     echo "suppressMessages(bspm::enable())"  >> /etc/R/Rprofile.site
     echo "options(bspm.version.check=FALSE)" >> /etc/R/Rprofile.site
-    # 多用するパッケージ — pure binary install, no compile
-    apt-get install -y --no-install-recommends \
-      r-cran-tidyverse r-cran-lubridate r-cran-stringr \
-      r-cran-languageserver r-cran-httpgd
+    # Sanity check that the lab can actually use this R out of the box.
+    cli_tools_dir="$(dirname "$(readlink -f "$0")")/../cli_tools"
+    if [ -x "$cli_tools_dir/check_r.sh" ]; then
+        "$cli_tools_dir/check_r.sh" || \
+            echo "*** WARNING: check_r.sh reported missing pieces. ***"
+    fi
 else
     pretty=$(. /etc/os-release; echo "$PRETTY_NAME")
     echo "*** Skipping R/r2u install: $pretty is not LTS. ***"
