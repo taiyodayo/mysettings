@@ -69,34 +69,40 @@ systemctl restart docker
 apt-get install -y netdata
 
 # R via r2u — binary CRAN packages from Ubuntu apt.
-# r2u is locked to current Ubuntu LTS (22.04 jammy / 24.04 noble). Replaces
-# the old CRAN-source workflow: no compile-time, no manual dev-package list,
-# all CRAN dependencies resolved as binary debs.
+# r2u only ships repos for current Ubuntu LTS (22.04 jammy / 24.04 noble).
+# Skip the whole R install on non-LTS — there's no r2u source for it and
+# we don't want to silently fall back to the slow CRAN-source workflow.
 # 詳細: https://eddelbuettel.github.io/r2u/
-wget -qO- https://eddelbuettel.github.io/r2u/assets/dirk_eddelbuettel_key.asc \
-  | tee /etc/apt/trusted.gpg.d/cranapt_key.asc > /dev/null
-echo "deb [arch=amd64] https://r2u.stat.illinois.edu/ubuntu $(lsb_release -cs) main" \
-  > /etc/apt/sources.list.d/cranapt.list
-# Pin so r2u always wins over the default Ubuntu r-cran-* packages
-cat > /etc/apt/preferences.d/99cranapt <<'PIN'
+if grep -q 'LTS' /etc/os-release; then
+    wget -qO- https://eddelbuettel.github.io/r2u/assets/dirk_eddelbuettel_key.asc \
+      | tee /etc/apt/trusted.gpg.d/cranapt_key.asc > /dev/null
+    echo "deb [arch=amd64] https://r2u.stat.illinois.edu/ubuntu $(lsb_release -cs) main" \
+      > /etc/apt/sources.list.d/cranapt.list
+    # Pin so r2u always wins over the default Ubuntu r-cran-* packages
+    cat > /etc/apt/preferences.d/99cranapt <<'PIN'
 Package: *
 Pin: release o=CRAN-Apt Project
 Pin: release l=CRAN-Apt Packages
 Pin-Priority: 700
 PIN
-apt-get update
-apt-get install -y --no-install-recommends r-base r-base-dev
-# bspm = Bridge to System Package Manager. After enabling, install.packages()
-# in R uses apt under the hood, so any tooling that calls install.packages()
-# (Rscript, RStudio, languageserver) also gets binary debs.
-apt-get install -y python3-dbus python3-gi python3-apt
-apt-get install -y --no-install-recommends r-cran-bspm
-echo "suppressMessages(bspm::enable())"  >> /etc/R/Rprofile.site
-echo "options(bspm.version.check=FALSE)" >> /etc/R/Rprofile.site
-# 多用するパッケージ — pure binary install, no compile
-apt-get install -y --no-install-recommends \
-  r-cran-tidyverse r-cran-lubridate r-cran-stringr \
-  r-cran-languageserver r-cran-httpgd
+    apt-get update
+    apt-get install -y --no-install-recommends r-base r-base-dev
+    # bspm = Bridge to System Package Manager. After enabling, install.packages()
+    # in R uses apt under the hood, so any tooling that calls install.packages()
+    # (Rscript, RStudio, languageserver) also gets binary debs.
+    apt-get install -y python3-dbus python3-gi python3-apt
+    apt-get install -y --no-install-recommends r-cran-bspm
+    echo "suppressMessages(bspm::enable())"  >> /etc/R/Rprofile.site
+    echo "options(bspm.version.check=FALSE)" >> /etc/R/Rprofile.site
+    # 多用するパッケージ — pure binary install, no compile
+    apt-get install -y --no-install-recommends \
+      r-cran-tidyverse r-cran-lubridate r-cran-stringr \
+      r-cran-languageserver r-cran-httpgd
+else
+    pretty=$(. /etc/os-release; echo "$PRETTY_NAME")
+    echo "*** Skipping R/r2u install: $pretty is not LTS. ***"
+    echo "*** r2u supports Ubuntu LTS only — re-run R section after upgrade. ***"
+fi
 
 # misc/datatools でよく使うパッケージ
 # ghostscript9, imagemagick7 via imei

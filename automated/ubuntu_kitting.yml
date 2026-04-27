@@ -142,61 +142,81 @@
         state: present
 
     # ---- R via r2u (binary CRAN packages from Ubuntu apt) ----
-    # r2u is locked to current Ubuntu LTS. Removes the CRAN-source compile
-    # step and the long lib*-dev list. https://eddelbuettel.github.io/r2u/
+    # r2u only ships repos for current Ubuntu LTS. The whole block is gated
+    # on is_lts; non-LTS hosts get a skip message and no R is installed.
+    # https://eddelbuettel.github.io/r2u/
 
-    - name: Install r2u signing key
-      ansible.builtin.get_url:
-        url: https://eddelbuettel.github.io/r2u/assets/dirk_eddelbuettel_key.asc
-        dest: /etc/apt/trusted.gpg.d/cranapt_key.asc
-        mode: "0644"
-        force: false
+    - name: Read /etc/os-release to detect LTS
+      ansible.builtin.slurp:
+        src: /etc/os-release
+      register: os_release_raw
 
-    - name: Add r2u apt repo
-      ansible.builtin.apt_repository:
-        repo: "deb [arch=amd64] https://r2u.stat.illinois.edu/ubuntu {{ ansible_distribution_release }} main"
-        filename: cranapt
-        state: present
-        update_cache: true
+    - name: Set is_lts fact
+      ansible.builtin.set_fact:
+        is_lts: "{{ 'LTS' in (os_release_raw.content | b64decode) }}"
 
-    - name: Pin r2u over default Ubuntu r-cran-* packages
-      ansible.builtin.copy:
-        dest: /etc/apt/preferences.d/99cranapt
-        mode: "0644"
-        content: |
-          Package: *
-          Pin: release o=CRAN-Apt Project
-          Pin: release l=CRAN-Apt Packages
-          Pin-Priority: 700
+    - name: Skip R install on non-LTS
+      ansible.builtin.debug:
+        msg: >-
+          Skipping r2u-based R install — {{ ansible_distribution }}
+          {{ ansible_distribution_version }} is not LTS. r2u supports LTS only.
+      when: not is_lts
 
-    - name: Install r-base + bspm bridge dependencies
-      ansible.builtin.apt:
-        name:
-          - r-base
-          - r-base-dev
-          - python3-dbus
-          - python3-gi
-          - python3-apt
-          - r-cran-bspm
-        state: present
-        install_recommends: false
-        update_cache: true
+    - name: Install R via r2u
+      when: is_lts
+      block:
+        - name: Install r2u signing key
+          ansible.builtin.get_url:
+            url: https://eddelbuettel.github.io/r2u/assets/dirk_eddelbuettel_key.asc
+            dest: /etc/apt/trusted.gpg.d/cranapt_key.asc
+            mode: "0644"
+            force: false
 
-    - name: Enable bspm in Rprofile.site (binary install via apt)
-      ansible.builtin.blockinfile:
-        path: /etc/R/Rprofile.site
-        create: true
-        mode: "0644"
-        marker: "# {mark} ANSIBLE MANAGED BLOCK - bspm"
-        block: |
-          suppressMessages(bspm::enable())
-          options(bspm.version.check=FALSE)
+        - name: Add r2u apt repo
+          ansible.builtin.apt_repository:
+            repo: "deb [arch=amd64] https://r2u.stat.illinois.edu/ubuntu {{ ansible_distribution_release }} main"
+            filename: cranapt
+            state: present
+            update_cache: true
 
-    - name: Install lab-wide R packages as binary debs
-      ansible.builtin.apt:
-        name: "{{ r_apt_packages }}"
-        state: present
-        install_recommends: false
+        - name: Pin r2u over default Ubuntu r-cran-* packages
+          ansible.builtin.copy:
+            dest: /etc/apt/preferences.d/99cranapt
+            mode: "0644"
+            content: |
+              Package: *
+              Pin: release o=CRAN-Apt Project
+              Pin: release l=CRAN-Apt Packages
+              Pin-Priority: 700
+
+        - name: Install r-base + bspm bridge dependencies
+          ansible.builtin.apt:
+            name:
+              - r-base
+              - r-base-dev
+              - python3-dbus
+              - python3-gi
+              - python3-apt
+              - r-cran-bspm
+            state: present
+            install_recommends: false
+            update_cache: true
+
+        - name: Enable bspm in Rprofile.site (binary install via apt)
+          ansible.builtin.blockinfile:
+            path: /etc/R/Rprofile.site
+            create: true
+            mode: "0644"
+            marker: "# {mark} ANSIBLE MANAGED BLOCK - bspm"
+            block: |
+              suppressMessages(bspm::enable())
+              options(bspm.version.check=FALSE)
+
+        - name: Install lab-wide R packages as binary debs
+          ansible.builtin.apt:
+            name: "{{ r_apt_packages }}"
+            state: present
+            install_recommends: false
 
     # ---- pinned ghostscript + IMEI builds ImageMagick 7 against it ----
 
