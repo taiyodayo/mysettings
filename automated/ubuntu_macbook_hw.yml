@@ -1,0 +1,52 @@
+---
+# Replaces ubuntu_on_macbook.sh. Adds SPI modules to initramfs and
+# installs the patched MacBook12 audio driver. Reboot manually after
+# this completes so the new initramfs takes effect.
+
+- name: MacBook10,1-on-Ubuntu hardware fixes
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    spi_modules: [applespi, intel_lpss_pci, spi_pxa2xx_platform, spi_pxa2xx_pci]
+    audio_driver_repo: https://github.com/x5444/macbook12-audio-driver
+
+  tasks:
+    - name: Ensure SPI modules listed in initramfs config
+      ansible.builtin.lineinfile:
+        path: /etc/initramfs-tools/modules
+        line: "{{ item }}"
+      loop: "{{ spi_modules }}"
+      register: initramfs_modules
+
+    - name: Rebuild initramfs if module list changed
+      ansible.builtin.command: update-initramfs -u
+      when: initramfs_modules.changed
+
+    - name: Install git for cloning the audio driver
+      ansible.builtin.apt:
+        name: git
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Detect existing cs8409 codec module
+      ansible.builtin.command: modinfo snd-hda-codec-cs8409
+      register: cs8409_present
+      failed_when: false
+      changed_when: false
+
+    - name: Install patched MacBook12 audio driver (cs8409)
+      when: cs8409_present.rc != 0
+      block:
+        - ansible.builtin.git:
+            repo: "{{ audio_driver_repo }}"
+            dest: /tmp/macbook12-audio-driver
+            force: true
+        - ansible.builtin.command:
+            cmd: ./install.sh
+            chdir: /tmp/macbook12-audio-driver
+        - ansible.builtin.file:
+            path: /tmp/macbook12-audio-driver
+            state: absent

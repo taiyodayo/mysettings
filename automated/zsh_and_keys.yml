@@ -1,0 +1,106 @@
+---
+# Replaces setup_zsh_and_keys.sh (Linux side only — Mac kitting will live
+# in a separate directory later).
+#
+# Usage:
+#   make zsh                          # zsh setup, no key import
+#   make zsh GH=taiyodayo             # also fetch GitHub ed25519 key
+
+- name: Configure zsh + import GitHub SSH key
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: "{{ ansible_user_id }}"
+    user_home: "/home/{{ target_user }}"
+    mysettings_repo_dir: "{{ playbook_dir | dirname }}"
+    github_username: ""
+
+  tasks:
+    - name: Refuse to run on non-Debian Linux
+      ansible.builtin.assert:
+        that: ansible_facts['os_family'] == 'Debian'
+        fail_msg: "This playbook only supports Debian/Ubuntu."
+
+    - name: Install zsh prerequisites
+      ansible.builtin.apt:
+        name: [git, curl, zsh]
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Resolve zsh path
+      ansible.builtin.command: which zsh
+      register: zsh_path
+      changed_when: false
+
+    - name: Set login shell to zsh
+      ansible.builtin.user:
+        name: "{{ target_user }}"
+        shell: "{{ zsh_path.stdout }}"
+
+    - name: Back up existing .zshrc once
+      become_user: "{{ target_user }}"
+      ansible.builtin.copy:
+        src: "{{ user_home }}/.zshrc"
+        dest: "{{ user_home }}/.zshrc.bak.{{ ansible_date_time.iso8601_basic_short }}"
+        remote_src: true
+        force: false
+      failed_when: false
+
+    - name: Deploy _zshrc → ~/.zshrc
+      become_user: "{{ target_user }}"
+      ansible.builtin.copy:
+        src: "{{ mysettings_repo_dir }}/_zshrc"
+        dest: "{{ user_home }}/.zshrc"
+        mode: "0644"
+
+    - name: Deploy _p10k.zsh → ~/.p10k.zsh
+      become_user: "{{ target_user }}"
+      ansible.builtin.copy:
+        src: "{{ mysettings_repo_dir }}/_p10k.zsh"
+        dest: "{{ user_home }}/.p10k.zsh"
+        mode: "0644"
+
+    - name: Ensure ~/.ssh is 0700
+      become_user: "{{ target_user }}"
+      ansible.builtin.file:
+        path: "{{ user_home }}/.ssh"
+        state: directory
+        mode: "0700"
+
+    - name: Skip GitHub key import when no username supplied
+      ansible.builtin.meta: end_play
+      when: github_username | length == 0
+
+    - name: Sanitise GitHub username (alphanumeric + hyphen, max 39 chars)
+      ansible.builtin.set_fact:
+        gh_user: "{{ (github_username | regex_replace('[^a-zA-Z0-9-]', ''))[:39] }}"
+
+    - name: Fail if sanitised username is empty
+      ansible.builtin.assert:
+        that: gh_user | length > 0
+
+    - name: Fetch GitHub user public keys
+      ansible.builtin.uri:
+        url: "https://github.com/{{ gh_user }}.keys"
+        return_content: true
+      register: gh_keys
+      delegate_to: localhost
+      become: false
+
+    - name: Pick first ed25519 key
+      ansible.builtin.set_fact:
+        gh_ed25519: "{{ (gh_keys.content.splitlines() | select('match', '^ssh-ed25519 ') | list | first) | default('') }}"
+
+    - name: Fail if no ed25519 key was found
+      ansible.builtin.assert:
+        that: gh_ed25519 | length > 0
+        fail_msg: "GitHub user '{{ gh_user }}' has no ed25519 SSH key"
+
+    - name: Authorise the GitHub key
+      ansible.posix.authorized_key:
+        user: "{{ target_user }}"
+        key: "{{ gh_ed25519 }}"
+        state: present

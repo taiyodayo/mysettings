@@ -1,0 +1,273 @@
+---
+# Declarative replacement for ubuntu/my_ubuntu_setup.sh.
+#
+# Usage:
+#   cd automated
+#   make bootstrap                   # one-time: install collections
+#   make kit                         # full ubuntu kitting (sudo prompted)
+#
+# Override the user that owns brew / mise / uv / ~/.zshrc with
+#   -e target_user=foo
+
+- name: Ubuntu server kitting — system layer
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: "{{ ansible_user_id }}"
+    mysettings_repo_dir: "{{ playbook_dir | dirname }}"
+    base_packages:
+      - zsh
+      - avahi-daemon
+      - parallel
+      - wireguard-tools
+      - nkf
+      - iftop
+      - iotop
+      - rclone
+      - lm-sensors
+      - build-essential
+      - gpg
+      - software-properties-common
+      - dirmngr
+    r_build_deps:
+      - libharfbuzz-dev
+      - libfribidi-dev
+      - libfreetype6-dev
+      - libpng-dev
+      - libtiff5-dev
+      - libjpeg-dev
+      - libxml2-dev
+      - libcurl4-openssl-dev
+      - libfontconfig1-dev
+      - libssl-dev
+      - libcairo2-dev
+    r_packages: [tidyverse, lubridate, stringr, languageserver, httpgd]
+    # gs 10 has a PDF mojibake bug for Japanese — pin to the patched 9.55 build.
+    ghostscript_pinned: "9.55.0~dfsg1-0ubuntu5.4"
+
+  tasks:
+    # ---- base packages, timezone, sysctl ----
+
+    - name: Install base apt packages
+      ansible.builtin.apt:
+        name: "{{ base_packages }}"
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Set timezone to Asia/Tokyo
+      community.general.timezone:
+        name: Asia/Tokyo
+
+    - name: Tune vm.swappiness
+      ansible.posix.sysctl:
+        name: vm.swappiness
+        value: "10"
+        sysctl_file: /etc/sysctl.conf
+        state: present
+        reload: true
+
+    # ---- mise (apt repo) ----
+
+    - name: Ensure /etc/apt/keyrings exists
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Fetch mise apt signing key
+      ansible.builtin.get_url:
+        url: https://mise.jdx.dev/gpg-key.pub
+        dest: /etc/apt/keyrings/mise-archive-keyring.asc
+        mode: "0644"
+        force: false
+
+    - name: Dearmor mise key
+      ansible.builtin.command:
+        cmd: gpg --batch --yes --dearmor -o /etc/apt/keyrings/mise-archive-keyring.gpg /etc/apt/keyrings/mise-archive-keyring.asc
+        creates: /etc/apt/keyrings/mise-archive-keyring.gpg
+
+    - name: Add mise apt repo
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch={{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}] https://mise.jdx.dev/deb stable main"
+        filename: mise
+        state: present
+
+    - name: Install mise
+      ansible.builtin.apt:
+        name: mise
+        state: present
+        update_cache: true
+
+    # ---- docker ----
+
+    - name: Install docker.io and compose plugin
+      ansible.builtin.apt:
+        name: [docker.io, docker-compose-plugin]
+        state: present
+
+    - name: Add target user to docker group
+      ansible.builtin.user:
+        name: "{{ target_user }}"
+        groups: docker
+        append: true
+
+    - name: Enable and start docker
+      ansible.builtin.systemd:
+        name: docker
+        enabled: true
+        state: started
+
+    # ---- mailab CA cert (so docker/curl trust *.local / *.mai over TLS) ----
+
+    - name: Install mailab root CA into system trust store
+      ansible.builtin.copy:
+        src: "{{ mysettings_repo_dir }}/certs/mailab_root_ca.crt"
+        dest: /usr/local/share/ca-certificates/mailab_root_ca.crt
+        owner: root
+        group: root
+        mode: "0644"
+      register: mailab_ca
+
+    - name: Update CA certificates
+      ansible.builtin.command: update-ca-certificates
+      when: mailab_ca.changed
+
+    - name: Restart docker after CA update
+      ansible.builtin.systemd:
+        name: docker
+        state: restarted
+      when: mailab_ca.changed
+
+    # ---- netdata ----
+
+    - name: Install netdata
+      ansible.builtin.apt:
+        name: netdata
+        state: present
+
+    # ---- R + tidyverse ----
+
+    - name: Install CRAN signing key
+      ansible.builtin.get_url:
+        url: https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc
+        dest: /etc/apt/trusted.gpg.d/cran_ubuntu_key.asc
+        mode: "0644"
+        force: false
+
+    - name: Add CRAN apt repo
+      ansible.builtin.apt_repository:
+        repo: "deb https://cloud.r-project.org/bin/linux/ubuntu {{ ansible_distribution_release }}-cran40/"
+        filename: cran
+        state: present
+        update_cache: true
+
+    - name: Install r-base + tidyverse build deps
+      ansible.builtin.apt:
+        name: "{{ ['r-base'] + r_build_deps }}"
+        state: present
+
+    - name: Bootstrap pacman in R
+      ansible.builtin.command:
+        cmd: Rscript -e 'if (!requireNamespace("pacman", quietly=TRUE)) install.packages("pacman", repos="https://cloud.r-project.org")'
+      changed_when: false
+
+    - name: Load tidyverse + others via pacman::p_load
+      ansible.builtin.command:
+        cmd: Rscript -e 'pacman::p_load({{ r_packages | join(", ") }})'
+      changed_when: false
+
+    # ---- pinned ghostscript + IMEI builds ImageMagick 7 against it ----
+
+    - name: Install pinned ghostscript and PDF tools
+      ansible.builtin.apt:
+        name:
+          - "ghostscript={{ ghostscript_pinned }}"
+          - qpdf
+          - mupdf
+        state: present
+        allow_downgrade: true
+
+    - name: Detect existing ImageMagick 7
+      ansible.builtin.command: magick -version
+      register: imagemagick_check
+      changed_when: false
+      failed_when: false
+
+    - name: Run IMEI installer to build IM7 against pinned gs
+      when: imagemagick_check.rc != 0
+      block:
+        - ansible.builtin.get_url:
+            url: https://dist.1-2.dev/imei.sh
+            dest: /tmp/imei.sh
+            mode: "0755"
+        - ansible.builtin.command: /tmp/imei.sh
+        - ansible.builtin.file:
+            path: /tmp/imei.sh
+            state: absent
+
+
+- name: Ubuntu server kitting — user layer
+  hosts: all
+  become: true
+  gather_facts: false
+
+  vars:
+    target_user: "{{ ansible_user_id }}"
+    user_home: "/home/{{ target_user }}"
+    git_user_name: "taiyo@{{ ansible_hostname }} default"
+    git_user_email: "taiyodayo@gmail.com"
+
+  tasks:
+    - name: Install Homebrew (linuxbrew) for target user
+      become_user: "{{ target_user }}"
+      ansible.builtin.shell: |
+        NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+      args:
+        creates: /home/linuxbrew/.linuxbrew/bin/brew
+
+    - name: Source linuxbrew shellenv from ~/.zprofile
+      become_user: "{{ target_user }}"
+      ansible.builtin.lineinfile:
+        path: "{{ user_home }}/.zprofile"
+        line: 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"'
+        create: true
+        mode: "0644"
+
+    - name: Activate mise + add cli_tools / ~/.local/bin to PATH in ~/.zshrc
+      become_user: "{{ target_user }}"
+      ansible.builtin.blockinfile:
+        path: "{{ user_home }}/.zshrc"
+        create: true
+        mode: "0644"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - mise + PATH"
+        block: |
+          eval "$(mise activate zsh)"
+          export PATH="$HOME/mysettings/cli_tools:$PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+
+    - name: Set global mise node version to lts
+      become_user: "{{ target_user }}"
+      ansible.builtin.command: mise use --global node@lts
+      register: mise_use
+      changed_when: "'already' not in (mise_use.stderr | default(''))"
+      environment:
+        PATH: "/home/linuxbrew/.linuxbrew/bin:{{ user_home }}/.local/bin:/usr/bin:/bin"
+
+    - name: Install uv (astral.sh) for target user
+      become_user: "{{ target_user }}"
+      ansible.builtin.shell: curl -LsSf https://astral.sh/uv/install.sh | sh
+      args:
+        creates: "{{ user_home }}/.local/bin/uv"
+
+    - name: Configure global git identity
+      become_user: "{{ target_user }}"
+      community.general.git_config:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        scope: global
+      loop:
+        - { name: user.name,  value: "{{ git_user_name }}" }
+        - { name: user.email, value: "{{ git_user_email }}" }

@@ -1,0 +1,112 @@
+---
+# Replaces cli_tools/llms_update.sh. Run periodically to keep the
+# Anthropic / Google / OpenAI CLIs current. Re-runs are safe.
+
+- name: Update LLM CLIs (gemini, claude, codex)
+  hosts: all
+  gather_facts: true
+
+  vars:
+    target_user: "{{ ansible_user_id }}"
+    user_home: "/home/{{ target_user }}"
+    bun_tools:
+      - { name: gemini, package: "@google/gemini-cli" }
+      - { name: codex,  package: "@openai/codex" }
+    claude_pkg: "@anthropic-ai/claude-code"
+    claude_installer_url: https://claude.ai/install.sh
+
+  tasks:
+    # ---- bun-managed tools (gemini, codex) ----
+
+    - name: Install/update bun-managed CLIs
+      ansible.builtin.command: bun add -g {{ item.package }}
+      loop: "{{ bun_tools }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: bun_add
+      changed_when: "'installed' in (bun_add.stdout | default('') | lower) or 'updated' in (bun_add.stdout | default('') | lower)"
+      environment:
+        PATH: "{{ user_home }}/.local/bin:{{ user_home }}/.bun/bin:/home/linuxbrew/.linuxbrew/bin:/usr/bin:/bin"
+
+    # ---- claude: purge non-native shims, then native install/update ----
+
+    - name: Purge non-native claude shims (bun/volta/npm)
+      ansible.builtin.shell: |
+        set -e
+        PKG="{{ claude_pkg }}"
+        CLEANED=""
+
+        # bun
+        if [ -e "$HOME/.bun/bin/claude" ]; then
+          command -v bun >/dev/null 2>&1 && bun remove -g "$PKG" >/dev/null 2>&1 || true
+          rm -f "$HOME/.bun/bin/claude"
+          CLEANED="$CLEANED bun"
+        fi
+
+        # volta — every installed node version, plus the volta shim
+        for vbin in "$HOME/.volta/tools/image/node/"*"/bin/claude"; do
+          [ -e "$vbin" ] || continue
+          vbindir="${vbin%/claude}"
+          vnpm="$vbindir/npm"
+          if [ -x "$vnpm" ]; then
+            PATH="$vbindir:$PATH" "$vnpm" uninstall -g "$PKG" >/dev/null 2>&1 || true
+          fi
+          rm -f "$vbin"
+          CLEANED="$CLEANED volta"
+        done
+        if [ -e "$HOME/.volta/bin/claude" ]; then
+          command -v volta >/dev/null 2>&1 && {
+            volta uninstall "$PKG" >/dev/null 2>&1 \
+              || volta uninstall claude >/dev/null 2>&1 \
+              || true
+          }
+          rm -f "$HOME/.volta/bin/claude"
+          CLEANED="$CLEANED volta"
+        fi
+
+        # non-volta global npm
+        if command -v npm >/dev/null 2>&1; then
+          NPM_ROOT=$(npm root -g 2>/dev/null || true)
+          case "$NPM_ROOT" in
+            "$HOME/.volta/tools/image/node/"*) NPM_ROOT="" ;;
+          esac
+          if [ -n "$NPM_ROOT" ] && [ -d "$NPM_ROOT/{{ claude_pkg }}" ]; then
+            npm uninstall -g "$PKG" >/dev/null 2>&1 || true
+            CLEANED="$CLEANED npm"
+          fi
+        fi
+
+        echo "cleaned:${CLEANED}"
+      register: claude_purge
+      changed_when: "'cleaned: ' not in claude_purge.stdout"
+      environment:
+        PATH: "{{ user_home }}/.local/bin:{{ user_home }}/.bun/bin:{{ user_home }}/.volta/bin:/home/linuxbrew/.linuxbrew/bin:/usr/bin:/bin"
+
+    - name: Detect native claude binary
+      ansible.builtin.stat:
+        path: "{{ user_home }}/.local/bin/claude"
+      register: claude_native
+
+    - name: Self-update claude via native binary
+      when: claude_native.stat.exists
+      ansible.builtin.command: "{{ user_home }}/.local/bin/claude update"
+      register: claude_update
+      changed_when: "'up to date' not in (claude_update.stdout | default('') | lower)"
+
+    - name: Run native installer (fresh install)
+      when: not claude_native.stat.exists
+      ansible.builtin.shell: curl -fsSL {{ claude_installer_url }} | bash
+      args:
+        creates: "{{ user_home }}/.local/bin/claude"
+
+    - name: Ensure ~/.local/bin is on PATH in interactive shells
+      ansible.builtin.blockinfile:
+        path: "{{ item }}"
+        create: false
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - llms_update local bin"
+        block: |
+          export PATH="$HOME/.local/bin:$PATH"
+      loop:
+        - "{{ user_home }}/.zshrc"
+        - "{{ user_home }}/.bashrc"
+      failed_when: false

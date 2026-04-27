@@ -1,0 +1,41 @@
+---
+# Replaces ubuntu/ubuntu_motd_clean.sh. Strips ESM/marketing lines from
+# Ubuntu's MOTD.
+
+- name: Clean up Ubuntu SSH MOTD
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Disable ubuntu-advantage MOTD ad
+      ansible.builtin.copy:
+        dest: /etc/default/ubuntu-advantage
+        content: "ENABLED=0\n"
+        mode: "0644"
+
+    - name: Strip Documentation/Management/Support lines from header
+      ansible.builtin.replace:
+        path: /etc/update-motd.d/00-header
+        regexp: "{{ item }}"
+        replace: ""
+      loop:
+        - '^.*Documentation:.*$'
+        - '^.*Management:.*$'
+        - '^.*Support:.*$'
+      failed_when: false
+
+    - name: Disable 10-help-text (chmod -x)
+      ansible.builtin.file:
+        path: /etc/update-motd.d/10-help-text
+        mode: "0644"
+      failed_when: false
+
+    - name: Clear motd-news cache
+      ansible.builtin.file:
+        path: /var/cache/motd-news
+        state: absent
+
+    - name: Regenerate MOTD
+      ansible.builtin.command: run-parts /etc/update-motd.d/
+      changed_when: false
+      failed_when: false

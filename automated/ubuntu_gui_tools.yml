@@ -1,0 +1,56 @@
+---
+# Replaces ubuntu/setup_gui_tools.sh. Workstation only — installs Chrome,
+# Android Studio, OpenJDK, and Fira Code.
+
+- name: Install Ubuntu GUI tools
+  hosts: all
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Install fonts and JDK
+      ansible.builtin.apt:
+        name: [fonts-firacode, openjdk-11-jdk]
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Add Android Studio PPA
+      ansible.builtin.apt_repository:
+        repo: ppa:maarten-fonville/android-studio
+        state: present
+        update_cache: true
+
+    - name: Install Android Studio
+      ansible.builtin.apt:
+        name: android-studio
+        state: present
+
+    - name: Ensure /etc/apt/keyrings exists
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Fetch Google Chrome signing key
+      ansible.builtin.get_url:
+        url: https://dl.google.com/linux/linux_signing_key.pub
+        dest: /etc/apt/keyrings/google-chrome-keyring.asc
+        mode: "0644"
+        force: false
+
+    - name: Dearmor Google key
+      ansible.builtin.command:
+        cmd: gpg --batch --yes --dearmor -o /usr/share/keyrings/google-chrome-keyring.gpg /etc/apt/keyrings/google-chrome-keyring.asc
+        creates: /usr/share/keyrings/google-chrome-keyring.gpg
+
+    - name: Add Chrome apt repo
+      ansible.builtin.apt_repository:
+        repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main"
+        filename: google-chrome
+        state: present
+        update_cache: true
+
+    - name: Install Google Chrome
+      ansible.builtin.apt:
+        name: google-chrome-stable
+        state: present

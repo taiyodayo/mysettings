@@ -1,0 +1,194 @@
+---
+# Replaces ubuntu/superclean_ubuntuserver/{pre_boot_checks,mark_and_nuke,post_boot_checks}.sh.
+#
+# Default play (read-only audit):
+#   make audit
+#
+# Mark-and-nuke (preview only — dry-run, no destructive change):
+#   make purge
+#
+# Mark-and-nuke for real (actually purges):
+#   make purge-real
+#
+# Post-boot smoke test:
+#   make postboot
+
+- name: Pre-reboot safety audit
+  hosts: all
+  become: true
+  gather_facts: true
+  tags: [audit, preboot]
+
+  vars:
+    target_user: "{{ ansible_user_id }}"
+
+  tasks:
+    - name: Determine running kernel
+      ansible.builtin.command: uname -r
+      register: kernel
+      changed_when: false
+
+    - name: Confirm modules on disk match running kernel
+      ansible.builtin.stat:
+        path: "/lib/modules/{{ kernel.stdout }}/kernel/net/netfilter"
+      register: km
+
+    - name: Check SSH service is enabled
+      ansible.builtin.command: systemctl is-enabled ssh
+      register: ssh_enabled
+      failed_when: false
+      changed_when: false
+
+    - name: Look up target user's shell
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ target_user }}"
+
+    - name: Confirm shell binary exists
+      ansible.builtin.stat:
+        path: "{{ getent_passwd[target_user][5] }}"
+      register: shell_stat
+
+    - name: Read UFW status
+      ansible.builtin.command: ufw status
+      register: ufw
+      changed_when: false
+      failed_when: false
+
+    - name: Compute audit failures
+      ansible.builtin.set_fact:
+        failures: >-
+          {{
+            ([] if km.stat.exists else ['kernel modules missing for ' + kernel.stdout])
+            + ([] if ssh_enabled.stdout == 'enabled' else ['SSH service is not enabled'])
+            + ([] if shell_stat.stat.exists and shell_stat.stat.executable
+                  else ['shell ' + getent_passwd[target_user][5] + ' missing for ' + target_user])
+            + ([] if 'Status: active' not in ufw.stdout
+                  or (ufw.stdout is regex('^\s*(22(/tcp)?|OpenSSH)\s+.*ALLOW', multiline=True))
+                  else ['UFW active but SSH (22/OpenSSH) not allowed'])
+          }}
+
+    - name: Report
+      ansible.builtin.debug:
+        msg: >-
+          {{ '🚀 ALL SYSTEMS GO. SAFE TO REBOOT.'
+             if failures | length == 0 else
+             '🛑 DO NOT REBOOT. ' ~ (failures | length | string) ~ ' failure(s): '
+             ~ (failures | join('; ')) }}
+
+    - name: Fail if audit found problems
+      ansible.builtin.assert:
+        that: failures | length == 0
+        fail_msg: "Pre-reboot audit failed: {{ failures | join('; ') }}"
+
+
+- name: Mark-and-nuke (preview unless apply_purge=true)
+  hosts: all
+  become: true
+  gather_facts: false
+  tags: [purge, never]
+
+  vars:
+    apply_purge: false
+    backup_file: /root/services_backup.txt
+    # Anything not in this list (or its dependency closure) becomes
+    # eligible for `apt autoremove --purge`.
+    essentials:
+      - ubuntu-server
+      - linux-generic
+      - shim-signed
+      - grub-efi-amd64-signed
+      - efibootmgr
+      - sudo
+      - ca-certificates
+      - cron
+      - software-properties-common
+      - policykit-1
+      - gnupg
+      - zsh
+      - zsh-common
+      - openssh-server
+      - netplan.io
+      - bridge-utils
+      - iproute2
+      - dnsutils
+      - curl
+      - wget
+      - systemd-resolved
+      - docker.io
+      - docker-compose
+      - qemu-user-static
+      - wireguard
+      - zip
+      - unzip
+      - rsync
+      - tree
+      - ncdu
+      - tcpdump
+      - git
+      - htop
+      - vim
+      - nano
+      - tmux
+      - bash-completion
+
+  tasks:
+    - name: Snapshot enabled systemd units
+      ansible.builtin.shell: |
+        set -o pipefail
+        systemctl list-unit-files --state=enabled --no-legend | awk '{print $1}' > {{ backup_file }}
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: List manually installed packages
+      ansible.builtin.command: apt-mark showmanual
+      register: manual_list
+      changed_when: false
+
+    - name: Mark every package as auto-installed
+      ansible.builtin.command:
+        cmd: apt-mark auto {{ manual_list.stdout_lines | join(' ') }}
+      when: manual_list.stdout_lines | length > 0
+      changed_when: true
+
+    - name: Re-mark essentials as manually installed
+      ansible.builtin.command:
+        cmd: apt-mark manual {{ essentials | join(' ') }}
+      changed_when: true
+
+    - name: Preview autoremove
+      ansible.builtin.command: apt-get autoremove --purge --dry-run
+      register: preview
+      changed_when: false
+
+    - name: Show preview
+      ansible.builtin.debug:
+        var: preview.stdout_lines
+
+    - name: Apply autoremove --purge
+      ansible.builtin.apt:
+        autoremove: true
+        purge: true
+      when: apply_purge
+
+
+- name: Post-boot smoke test (docker hello-world)
+  hosts: all
+  become: true
+  gather_facts: false
+  tags: [postboot, never]
+
+  tasks:
+    - name: Confirm docker is running
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+
+    - name: Run hello-world container
+      ansible.builtin.command: docker run --rm hello-world
+      register: hello
+      changed_when: false
+
+    - ansible.builtin.debug:
+        var: hello.stdout_lines

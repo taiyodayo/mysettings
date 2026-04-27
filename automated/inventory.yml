@@ -1,0 +1,17 @@
+---
+# Default: run against the local machine. To target remote Ubuntu hosts,
+# replace the localhost entry below with real hostnames and remove
+# `ansible_connection: local` (Ansible will SSH into them).
+all:
+  hosts:
+    localhost:
+      ansible_connection: local
+      ansible_python_interpreter: "{{ ansible_playbook_python }}"
+
+  # Example for a remote fleet:
+  # hosts:
+  #   server-a.example.com:
+  #   server-b.example.com:
+  # vars:
+  #   ansible_user: taiyo
+  #   ansible_become: true
