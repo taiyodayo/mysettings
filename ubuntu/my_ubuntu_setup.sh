@@ -68,30 +68,35 @@ systemctl restart docker
 # aptでいれるのが一番早い。war roomへのノード追加はライセンス移行により辞めたほうが良くなった。
 apt-get install -y netdata
 
-# R の部
-# ubuntu に tidyverse で必要なパッケージ
-# キーを追加
-apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E084DAB9
-# update indices
-apt update -qq
-# install two helper packages we need
-apt install -y --no-install-recommends software-properties-common dirmngr
-# add the signing key (by Michael Rutter) for these repos
-# To verify key, run gpg --show-keys /etc/apt/trusted.gpg.d/cran_ubuntu_key.asc
-# Fingerprint: E298A3A825C0D65DFD57CBB651716619E084DAB9
-# cran の apt レポを追加
-wget -qO- https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc | tee -a /etc/apt/trusted.gpg.d/cran_ubuntu_key.asc
-# add the R 4.0 repo from CRAN -- adjust 'focal' to 'groovy' or 'bionic' as needed
-add-apt-repository -y "deb https://cloud.r-project.org/bin/linux/ubuntu $(lsb_release -cs)-cran40/"
-# インストール
+# R via r2u — binary CRAN packages from Ubuntu apt.
+# r2u is locked to current Ubuntu LTS (22.04 jammy / 24.04 noble). Replaces
+# the old CRAN-source workflow: no compile-time, no manual dev-package list,
+# all CRAN dependencies resolved as binary debs.
+# 詳細: https://eddelbuettel.github.io/r2u/
+wget -qO- https://eddelbuettel.github.io/r2u/assets/dirk_eddelbuettel_key.asc \
+  | tee /etc/apt/trusted.gpg.d/cranapt_key.asc > /dev/null
+echo "deb [arch=amd64] https://r2u.stat.illinois.edu/ubuntu $(lsb_release -cs) main" \
+  > /etc/apt/sources.list.d/cranapt.list
+# Pin so r2u always wins over the default Ubuntu r-cran-* packages
+cat > /etc/apt/preferences.d/99cranapt <<'PIN'
+Package: *
+Pin: release o=CRAN-Apt Project
+Pin: release l=CRAN-Apt Packages
+Pin-Priority: 700
+PIN
 apt-get update
-apt-get install -y r-base
-# tidyverseのビルドに必要なパッケージを追加
-apt-get install -y libharfbuzz-dev libfribidi-dev libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev \
-  libxml2-dev libcurl4-openssl-dev libfontconfig1-dev libssl-dev libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev libxml2-dev libcairo2-dev
-# 多用するパッケージはsudo で全ユーザ向けにインストールしておく
-Rscript -e 'install.packages("pacman")'
-Rscript -e 'pacman::p_load(tidyverse, lubridate, stringr, languageserver, httpgd)'
+apt-get install -y --no-install-recommends r-base r-base-dev
+# bspm = Bridge to System Package Manager. After enabling, install.packages()
+# in R uses apt under the hood, so any tooling that calls install.packages()
+# (Rscript, RStudio, languageserver) also gets binary debs.
+apt-get install -y python3-dbus python3-gi python3-apt
+apt-get install -y --no-install-recommends r-cran-bspm
+echo "suppressMessages(bspm::enable())"  >> /etc/R/Rprofile.site
+echo "options(bspm.version.check=FALSE)" >> /etc/R/Rprofile.site
+# 多用するパッケージ — pure binary install, no compile
+apt-get install -y --no-install-recommends \
+  r-cran-tidyverse r-cran-lubridate r-cran-stringr \
+  r-cran-languageserver r-cran-httpgd
 
 # misc/datatools でよく使うパッケージ
 # ghostscript9, imagemagick7 via imei
