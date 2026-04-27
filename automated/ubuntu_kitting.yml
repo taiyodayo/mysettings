@@ -231,15 +231,32 @@
             install_recommends: false
             update_cache: true
 
-        - name: Enable bspm in Rprofile.site (apt-binary install.packages)
+        # Enable bspm only in root R sessions: gives root's install.packages()
+        # apt-binary speed (system-wide) while keeping non-root users on the
+        # standard user-library / source-compile path, and silences the
+        # "D-Bus service not found" warning bspm prints on servers without
+        # PackageKit.
+        - name: Strip any flat-style bspm lines from earlier script versions
+          ansible.builtin.lineinfile:
+            path: /etc/R/Rprofile.site
+            regexp: "{{ item }}"
+            state: absent
+          loop:
+            - '^suppressMessages\(bspm::enable\(\)\)'
+            - '^options\(bspm\.version\.check=FALSE\)'
+
+        - name: Configure bspm (root-only enable) in Rprofile.site
           ansible.builtin.blockinfile:
             path: /etc/R/Rprofile.site
             create: true
             mode: "0644"
-            marker: "# {mark} ANSIBLE MANAGED BLOCK - bspm"
+            marker: "# {mark} ANSIBLE MANAGED BLOCK - mysettings bspm"
             block: |
-              suppressMessages(bspm::enable())
-              options(bspm.version.check=FALSE)
+              if (Sys.info()[["effective_user"]] == "root") {
+                  options(bspm.sudo = TRUE)
+                  options(bspm.version.check = FALSE)
+                  suppressMessages(bspm::enable())
+              }
 
         - name: Verify R install (bspm + preloaded packages)
           ansible.builtin.command: "{{ mysettings_repo_dir }}/cli_tools/check_r.sh"

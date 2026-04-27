@@ -120,14 +120,23 @@ PIN
       r-cran-arrow r-cran-jsonlite r-cran-readxl \
       r-cran-rmarkdown r-cran-knitr r-cran-devtools \
       r-cran-renv r-cran-languageserver r-cran-httpgd
-    # Enable bspm globally so install.packages() / pacman::p_load() in any
-    # later R session also resolve to apt binaries (RStudio install button,
-    # Rscript pipelines, languageserver completions, etc.).
-    # Guarded so re-runs don't duplicate the lines.
-    grep -qF 'bspm::enable' /etc/R/Rprofile.site 2>/dev/null \
-        || echo "suppressMessages(bspm::enable())"  >> /etc/R/Rprofile.site
-    grep -qF 'bspm.version.check' /etc/R/Rprofile.site 2>/dev/null \
-        || echo "options(bspm.version.check=FALSE)" >> /etc/R/Rprofile.site
+    # Enable bspm only in root R sessions. This gives root install.packages()
+    # apt-binary speed (system-wide) while keeping non-root users on the
+    # standard user-library / source-compile path. Also avoids the
+    # "D-Bus service not found" warning that bspm prints on servers
+    # without PackageKit. Managed-block format so re-runs replace cleanly.
+    rprofile=/etc/R/Rprofile.site
+    sed -i '/^suppressMessages(bspm::enable())/d; /^options(bspm.version.check=FALSE)/d' "$rprofile" 2>/dev/null || true
+    sed -i '/# === BEGIN mysettings bspm ===/,/# === END mysettings bspm ===/d' "$rprofile" 2>/dev/null || true
+    cat >> "$rprofile" <<'PROF'
+# === BEGIN mysettings bspm ===
+if (Sys.info()[["effective_user"]] == "root") {
+    options(bspm.sudo = TRUE)
+    options(bspm.version.check = FALSE)
+    suppressMessages(bspm::enable())
+}
+# === END mysettings bspm ===
+PROF
     # Sanity check that the lab can actually use this R out of the box.
     cli_tools_dir="$(dirname "$(readlink -f "$0")")/../cli_tools"
     if [ -x "$cli_tools_dir/check_r.sh" ]; then
