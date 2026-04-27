@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
 # ubuntu サーバを共通でセットアップします
+# Re-entrant: safe to run repeatedly. Each section guards against
+# duplicate state (apt-get install is idempotent, file edits are guarded
+# with grep, restart-docker only fires when the CA cert actually changed,
+# IMEI only runs when ImageMagick isn't already installed).
 if [[ $EUID -ne 0 ]]; then
-   echo "This script must be run as root"
+   echo "This script must be run as root" >&2
+   exit 1
+fi
+if [[ -z "${SUDO_USER:-}" ]]; then
+   echo "ERROR: SUDO_USER is not set." >&2
+   echo "Run via 'sudo' from the target user account, not directly as root." >&2
    exit 1
 fi
 
@@ -24,8 +33,12 @@ apt-get install -y zsh avahi-daemon parallel wireguard-tools nkf iftop iotop rcl
 
 # mise (公式 apt リポジトリ - brew より apt が推奨)
 apt-get install -y gpg
-curl -fsSL https://mise.jdx.dev/gpg-key.pub | gpg --dearmor -o /etc/apt/keyrings/mise-archive-keyring.gpg
-echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=amd64] https://mise.jdx.dev/deb stable main" | tee /etc/apt/sources.list.d/mise.list
+mkdir -p /etc/apt/keyrings
+# --batch --yes so re-runs overwrite the existing keyring without prompting
+curl -fsSL https://mise.jdx.dev/gpg-key.pub \
+  | gpg --batch --yes --dearmor -o /etc/apt/keyrings/mise-archive-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=amd64] https://mise.jdx.dev/deb stable main" \
+  > /etc/apt/sources.list.d/mise.list
 apt-get update && apt-get install -y mise
 
 # タイムゾーンを東京に設定
@@ -57,12 +70,15 @@ usermod -aG docker "${SUDO_USER}"
 #   echo '{"insecure-registries" : ["rx-7.local:5000", "7.mai:5000"]}' | sudo tee /etc/docker/daemon.json
 # fi
 # boomer.local / boomer.mai は ssl を使用するようになった。
-# 必要なルート証明書をコピー
-cp "/home/${SUDO_USER}/mysettings/certs/mailab_root_ca.crt" /usr/local/share/ca-certificates
-# 証明書を更新
-update-ca-certificates
-# docker をリスタート
-systemctl restart docker
+# 必要なルート証明書をコピー — only restart docker if the cert actually
+# changed, otherwise re-runs needlessly bounce running containers.
+ca_src="/home/${SUDO_USER}/mysettings/certs/mailab_root_ca.crt"
+ca_dest=/usr/local/share/ca-certificates/mailab_root_ca.crt
+if ! cmp -s "$ca_src" "$ca_dest" 2>/dev/null; then
+    cp "$ca_src" "$ca_dest"
+    update-ca-certificates
+    systemctl restart docker
+fi
 
 # netdata
 # aptでいれるのが一番早い。war roomへのノード追加はライセンス移行により辞めたほうが良くなった。
@@ -107,8 +123,11 @@ PIN
     # Enable bspm globally so install.packages() / pacman::p_load() in any
     # later R session also resolve to apt binaries (RStudio install button,
     # Rscript pipelines, languageserver completions, etc.).
-    echo "suppressMessages(bspm::enable())"  >> /etc/R/Rprofile.site
-    echo "options(bspm.version.check=FALSE)" >> /etc/R/Rprofile.site
+    # Guarded so re-runs don't duplicate the lines.
+    grep -qF 'bspm::enable' /etc/R/Rprofile.site 2>/dev/null \
+        || echo "suppressMessages(bspm::enable())"  >> /etc/R/Rprofile.site
+    grep -qF 'bspm.version.check' /etc/R/Rprofile.site 2>/dev/null \
+        || echo "options(bspm.version.check=FALSE)" >> /etc/R/Rprofile.site
     # Sanity check that the lab can actually use this R out of the box.
     cli_tools_dir="$(dirname "$(readlink -f "$0")")/../cli_tools"
     if [ -x "$cli_tools_dir/check_r.sh" ]; then
@@ -125,11 +144,14 @@ fi
 # ghostscript9, imagemagick7 via imei
 # gs 10はPDF処理にバグがあって使用できない！！ (使うと日本語文字が散発的に化ける) gs9.55を指定してインストール
 apt-get install -y ghostscript=9.55.0~dfsg1-0ubuntu5.4 qpdf mupdf
-# gs9.55 を使用するため、ソースからIM7をビルド
-t=$(mktemp) && \
-  wget 'https://dist.1-2.dev/imei.sh' -qO "$t" && \
-  bash "$t" && \
-  rm "$t"
+# gs9.55 を使用するため、ソースからIM7をビルド (slow source compile;
+# only run when ImageMagick 7 isn't already present so re-runs are fast)
+if ! command -v magick >/dev/null 2>&1; then
+    t=$(mktemp) && \
+      wget 'https://dist.1-2.dev/imei.sh' -qO "$t" && \
+      bash "$t" && \
+      rm "$t"
+fi
 
 
 ### ここからユーザランド ###
