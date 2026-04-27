@@ -49,11 +49,23 @@ for pkg in "${required[@]}"; do
 done
 
 # Rprofile.site config check — should be present regardless of who's running.
-if ! grep -q 'effective_user.*root.*bspm::enable\|# === BEGIN mysettings bspm ===' /etc/R/Rprofile.site 2>/dev/null; then
+if ! grep -qE '# === BEGIN mysettings (R config|bspm) ===|effective_user.*root.*bspm::enable' /etc/R/Rprofile.site 2>/dev/null; then
     echo
-    echo "✗ /etc/R/Rprofile.site is missing the bspm config block."
+    echo "✗ /etc/R/Rprofile.site is missing the mysettings R config block."
     echo "  Re-run ubuntu/my_ubuntu_setup.sh's R section."
     issues=$((issues + 1))
+fi
+
+# r-install wrapper check (allows non-root users to install r-cran-* via sudo)
+if [ -x /usr/local/bin/r-install ] && [ -f /etc/sudoers.d/r-installers ]; then
+    if id -nG "$USER" 2>/dev/null | tr ' ' '\n' | grep -qx r-installers; then
+        echo "✓ r-install wrapper deployed; $USER is in r-installers group."
+    else
+        echo "ℹ r-install wrapper deployed; $USER is NOT in r-installers."
+        echo "  Add with: sudo usermod -aG r-installers $USER  (then log out/in)"
+    fi
+else
+    echo "⚠ r-install wrapper not deployed (non-root users can't install r-cran-* via apt)."
 fi
 
 # bspm actually loads in a root R session?

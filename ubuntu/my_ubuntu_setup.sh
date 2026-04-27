@@ -120,22 +120,62 @@ PIN
       r-cran-arrow r-cran-jsonlite r-cran-readxl \
       r-cran-rmarkdown r-cran-knitr r-cran-devtools \
       r-cran-renv r-cran-languageserver r-cran-httpgd
-    # Enable bspm only in root R sessions. This gives root install.packages()
-    # apt-binary speed (system-wide) while keeping non-root users on the
-    # standard user-library / source-compile path. Also avoids the
-    # "D-Bus service not found" warning that bspm prints on servers
-    # without PackageKit. Managed-block format so re-runs replace cleanly.
+    # Deploy /usr/local/bin/r-install wrapper + r-installers group +
+    # sudoers rule, so non-root users can install r-cran-* packages
+    # system-wide via `sudo r-install ...` (the wrapper enforces a strict
+    # r-cran-* whitelist; the sudoers rule grants NOPASSWD ONLY on the
+    # wrapper, not apt-get directly).
+    install -m 0755 -o root -g root \
+        "$(dirname "$(readlink -f "$0")")/../cli_tools/r-install.sh" \
+        /usr/local/bin/r-install
+    groupadd -f r-installers
+    cat > /etc/sudoers.d/r-installers <<'SUDOERS'
+# Members of r-installers may run /usr/local/bin/r-install without
+# password. The wrapper validates that every argument is r-cran-* and
+# exec's `apt-get install`; removal is intentionally not granted.
+%r-installers ALL=(root) NOPASSWD: /usr/local/bin/r-install
+SUDOERS
+    chmod 0440 /etc/sudoers.d/r-installers
+    # Add the kitting user to r-installers (admin can add others later
+    # with `sudo usermod -aG r-installers <user>`).
+    usermod -aG r-installers "$SUDO_USER"
+
+    # Configure /etc/R/Rprofile.site:
+    # - Root R sessions get bspm (apt-binary install.packages → system lib)
+    # - install_apt() helper: same fast path for non-root users via sudo
+    #   r-install. install.packages() in user sessions stays untouched
+    #   (source compile to ~/R/.../) so personal/experimental work
+    #   doesn't accidentally pollute system lib.
     rprofile=/etc/R/Rprofile.site
+    # Strip any flat-style bspm lines and earlier marker variants
     sed -i '/^suppressMessages(bspm::enable())/d; /^options(bspm.version.check=FALSE)/d' "$rprofile" 2>/dev/null || true
     sed -i '/# === BEGIN mysettings bspm ===/,/# === END mysettings bspm ===/d' "$rprofile" 2>/dev/null || true
+    sed -i '/# === BEGIN mysettings R config ===/,/# === END mysettings R config ===/d' "$rprofile" 2>/dev/null || true
     cat >> "$rprofile" <<'PROF'
-# === BEGIN mysettings bspm ===
+# === BEGIN mysettings R config ===
+# Root R: bspm enabled → install.packages() goes via apt to system lib.
 if (Sys.info()[["effective_user"]] == "root") {
     options(bspm.sudo = TRUE)
     options(bspm.version.check = FALSE)
     suppressMessages(bspm::enable())
 }
-# === END mysettings bspm ===
+
+# install_apt(): non-root binary install via the r-install wrapper.
+# Available to everyone, but the underlying sudo only succeeds for users
+# in the r-installers group. Goes to system lib, visible to everyone.
+# Plain install.packages() is unchanged → user lib (source compile).
+install_apt <- function(...) {
+    pkgs <- unlist(list(...))
+    if (length(pkgs) == 0L) stop("install_apt: no packages given")
+    if (any(grepl("[^a-zA-Z0-9._-]", pkgs))) {
+        stop("install_apt: package names must be alphanumeric / . _ -")
+    }
+    apt_names <- paste0("r-cran-", tolower(gsub("[._]", "-", pkgs)))
+    cat("install_apt: sudo r-install ", paste(apt_names, collapse = " "), "\n", sep = "")
+    rc <- system2("sudo", c("-n", "/usr/local/bin/r-install", apt_names))
+    invisible(rc == 0L)
+}
+# === END mysettings R config ===
 PROF
     # Sanity check that the lab can actually use this R out of the box.
     cli_tools_dir="$(dirname "$(readlink -f "$0")")/../cli_tools"

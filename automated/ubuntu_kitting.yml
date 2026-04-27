@@ -231,12 +231,46 @@
             install_recommends: false
             update_cache: true
 
-        # Enable bspm only in root R sessions: gives root's install.packages()
-        # apt-binary speed (system-wide) while keeping non-root users on the
-        # standard user-library / source-compile path, and silences the
-        # "D-Bus service not found" warning bspm prints on servers without
-        # PackageKit.
-        - name: Strip any flat-style bspm lines from earlier script versions
+        # Deploy the r-install wrapper + r-installers group + sudoers rule
+        # so non-root users can install r-cran-* packages system-wide via
+        # `sudo r-install ...`. The wrapper enforces the r-cran-* whitelist;
+        # the sudoers entry grants NOPASSWD ONLY on the wrapper.
+        - name: Deploy r-install wrapper to /usr/local/bin
+          ansible.builtin.copy:
+            src: "{{ mysettings_repo_dir }}/cli_tools/r-install.sh"
+            dest: /usr/local/bin/r-install
+            owner: root
+            group: root
+            mode: "0755"
+
+        - name: Ensure r-installers group exists
+          ansible.builtin.group:
+            name: r-installers
+            state: present
+
+        - name: Drop sudoers rule for r-install wrapper
+          ansible.builtin.copy:
+            dest: /etc/sudoers.d/r-installers
+            owner: root
+            group: root
+            mode: "0440"
+            content: |
+              # Members of r-installers may run /usr/local/bin/r-install
+              # without password. The wrapper enforces the r-cran-* whitelist
+              # and never allows removal.
+              %r-installers ALL=(root) NOPASSWD: /usr/local/bin/r-install
+            validate: visudo -cf %s
+
+        - name: Add target user to r-installers
+          ansible.builtin.user:
+            name: "{{ target_user }}"
+            groups: r-installers
+            append: true
+
+        # /etc/R/Rprofile.site: root-only bspm + install_apt() helper for
+        # everyone. Plain install.packages() in non-root sessions is
+        # untouched (source compile to user lib).
+        - name: Strip any flat-style bspm lines from older script versions
           ansible.builtin.lineinfile:
             path: /etc/R/Rprofile.site
             regexp: "{{ item }}"
@@ -245,17 +279,39 @@
             - '^suppressMessages\(bspm::enable\(\)\)'
             - '^options\(bspm\.version\.check=FALSE\)'
 
-        - name: Configure bspm (root-only enable) in Rprofile.site
+        - name: Strip older mysettings-bspm marker block
+          ansible.builtin.blockinfile:
+            path: /etc/R/Rprofile.site
+            marker: "# {mark} ANSIBLE MANAGED BLOCK - mysettings bspm"
+            state: absent
+
+        - name: Configure /etc/R/Rprofile.site (bspm + install_apt helper)
           ansible.builtin.blockinfile:
             path: /etc/R/Rprofile.site
             create: true
             mode: "0644"
-            marker: "# {mark} ANSIBLE MANAGED BLOCK - mysettings bspm"
+            marker: "# {mark} ANSIBLE MANAGED BLOCK - mysettings R config"
             block: |
+              # Root R: bspm enabled → install.packages() via apt to system lib.
               if (Sys.info()[["effective_user"]] == "root") {
                   options(bspm.sudo = TRUE)
                   options(bspm.version.check = FALSE)
                   suppressMessages(bspm::enable())
+              }
+
+              # install_apt(): binary system install via the r-install wrapper.
+              # Works for users in r-installers group; plain install.packages()
+              # remains untouched and goes to ~/R/.../ via source compile.
+              install_apt <- function(...) {
+                  pkgs <- unlist(list(...))
+                  if (length(pkgs) == 0L) stop("install_apt: no packages given")
+                  if (any(grepl("[^a-zA-Z0-9._-]", pkgs))) {
+                      stop("install_apt: package names must be alphanumeric / . _ -")
+                  }
+                  apt_names <- paste0("r-cran-", tolower(gsub("[._]", "-", pkgs)))
+                  cat("install_apt: sudo r-install ", paste(apt_names, collapse = " "), "\n", sep = "")
+                  rc <- system2("sudo", c("-n", "/usr/local/bin/r-install", apt_names))
+                  invisible(rc == 0L)
               }
 
         - name: Verify R install (bspm + preloaded packages)
