@@ -74,15 +74,22 @@ apt-get install -y netdata
 # we don't want to silently fall back to the slow CRAN-source workflow.
 # 詳細: https://eddelbuettel.github.io/r2u/
 if grep -q 'LTS' /etc/os-release; then
+    # r2u repo — provides r-cran-* as binary debs.
     wget -qO- https://eddelbuettel.github.io/r2u/assets/dirk_eddelbuettel_key.asc \
       | tee /etc/apt/trusted.gpg.d/cranapt_key.asc > /dev/null
     echo "deb [arch=amd64] https://r2u.stat.illinois.edu/ubuntu $(lsb_release -cs) main" \
       > /etc/apt/sources.list.d/cranapt.list
-    # Pin so r2u always wins over the default Ubuntu r-cran-* packages
+    # Marutter CRAN repo — required alongside r2u: r2u's r-cran-* depend on
+    # current r-base-core (≥4.5.0) which only the Marutter repo provides.
+    wget -qO- https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc \
+      | tee /etc/apt/trusted.gpg.d/cran_ubuntu_key.asc > /dev/null
+    echo "deb https://cloud.r-project.org/bin/linux/ubuntu $(lsb_release -cs)-cran40/" \
+      > /etc/apt/sources.list.d/cran_r.list
+    # Pin r2u (origin: CRAN-Apt Project) so its packages always win over
+    # Ubuntu's defaults. Single Pin: line — apt-preferences ignores extras.
     cat > /etc/apt/preferences.d/99cranapt <<'PIN'
 Package: *
 Pin: release o=CRAN-Apt Project
-Pin: release l=CRAN-Apt Packages
 Pin-Priority: 700
 PIN
     apt-get update

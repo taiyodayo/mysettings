@@ -172,13 +172,32 @@
             mode: "0644"
             force: false
 
-        - name: Add r2u apt repo
+        - name: Add r2u apt repo (r-cran-* binary debs)
           ansible.builtin.apt_repository:
             repo: "deb [arch=amd64] https://r2u.stat.illinois.edu/ubuntu {{ ansible_distribution_release }} main"
             filename: cranapt
             state: present
+            update_cache: false
+
+        # The Marutter CRAN repo is required alongside r2u: r2u's r-cran-*
+        # packages depend on a current r-base-core (>=4.5.0) which only
+        # this repo provides — Ubuntu defaults still ship 4.3.3.
+        - name: Install Marutter CRAN signing key
+          ansible.builtin.get_url:
+            url: https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc
+            dest: /etc/apt/trusted.gpg.d/cran_ubuntu_key.asc
+            mode: "0644"
+            force: false
+
+        - name: Add Marutter CRAN apt repo (current r-base / r-base-core)
+          ansible.builtin.apt_repository:
+            repo: "deb https://cloud.r-project.org/bin/linux/ubuntu {{ ansible_distribution_release }}-cran40/"
+            filename: cran_r
+            state: present
             update_cache: true
 
+        # Single Pin: line per stanza — apt-preferences silently ignores
+        # extras, which is what was breaking r2u priority earlier.
         - name: Pin r2u over default Ubuntu r-cran-* packages
           ansible.builtin.copy:
             dest: /etc/apt/preferences.d/99cranapt
@@ -186,7 +205,6 @@
             content: |
               Package: *
               Pin: release o=CRAN-Apt Project
-              Pin: release l=CRAN-Apt Packages
               Pin-Priority: 700
 
         - name: Install r-base + bspm bridge dependencies
