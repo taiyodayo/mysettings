@@ -90,6 +90,7 @@ export MAI_DEBUG="rstudio_gui"
 
 git config --global user.name "taiyo@$(hostname) default"
 git config --global user.email "taiyodayo@gmail.com"
+git config --global fetch.prune true
 
 # "tmux not working with git when ssh -A" issue. Only modify SSH_AUTH_SOCK when inside tmux
 if [ -n "$TMUX" ] && [ -S "$SSH_AUTH_SOCK" ]; then

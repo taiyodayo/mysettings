@@ -234,6 +234,7 @@ export PATH="$HOME/.local/bin:$PATH"
 # git のデフォルト
 git config --global user.name "taiyo@$(hostname) default"
 git config --global user.email "taiyodayo@gmail.com"
+git config --global fetch.prune true
 
 # netdata
 # wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && \
