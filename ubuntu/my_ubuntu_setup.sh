@@ -41,6 +41,18 @@ echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=amd64] http
   > /etc/apt/sources.list.d/mise.list
 apt-get update && apt-get install -y mise
 
+# gh (GitHub CLI) — 公式 apt リポジトリ。Ubuntu 同梱の gh は古いので、
+# 公式リポを優先させて常に最新を取得する。
+# 詳細: https://github.com/cli/cli/blob/trunk/docs/install_linux.md
+mkdir -p -m 755 /etc/apt/keyrings
+wget -nv -O /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+  https://cli.github.com/packages/githubcli-archive-keyring.gpg
+chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+mkdir -p -m 755 /etc/apt/sources.list.d
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+  > /etc/apt/sources.list.d/github-cli.list
+apt-get update && apt-get install -y gh
+
 # タイムゾーンを東京に設定
 timedatectl set-timezone Asia/Tokyo
 
