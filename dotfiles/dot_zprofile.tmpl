@@ -1,0 +1,8 @@
+{{ if ne .chezmoi.os "darwin" -}}
+# Linuxbrew's installer convention puts shellenv here so login shells have brew on PATH.
+# ~/.zshrc also sources brew via the bootstrap loop, so this is mostly belt-and-suspenders
+# for login shells that don't read ~/.zshrc.
+if [ -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+fi
+{{ end -}}

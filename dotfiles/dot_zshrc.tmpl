@@ -1,0 +1,144 @@
+HISTFILE=~/.zsh_history
+SAVEHIST=1000
+HISTSIZE=1000
+setopt appendhistory
+# zsh のオススメ設定
+setopt interactivecomments  # ハッシュをコメントとして無視する (bashのように)
+setopt extended_glob        # 拡張グロブを有効にする
+setopt glob_dots            # 隠しファイルをグロブに含める (bashのように)
+setopt no_beep              # うるさいビープ音を止める
+
+# ~/.local/bin holds the native Claude Code binary (uv, other user-installed tools)
+export PATH="$HOME/.local/bin:$PATH"
+
+# Initialize brew in current session (handles architecture automatically).
+# Bootstraps brew from whichever install location exists — Apple Silicon, Intel, or linuxbrew.
+for brew_path in /opt/homebrew/bin/brew /usr/local/bin/brew /home/linuxbrew/.linuxbrew/bin/brew; do
+    if [[ -x "$brew_path" ]]; then
+        eval "$($brew_path shellenv)"
+        break
+    fi
+done
+
+# Initialize direnv if available
+if command -v direnv >/dev/null 2>&1; then
+    eval "$(direnv hook zsh)"
+fi
+
+### Added by Zinit's installer
+if [[ ! -f $HOME/.zinit/bin/zinit.zsh ]]; then
+    print -P "%F{33}▓▒░ %F{220}Installing %F{33}DHARMA%F{220} Initiative Plugin Manager (%F{33}zdharma/zinit%F{220})…%f"
+    command mkdir -p "$HOME/.zinit" && command chmod g-rwX "$HOME/.zinit"
+    command git clone https://github.com/zdharma-continuum/zinit "$HOME/.zinit/bin" && \
+        print -P "%F{33}▓▒░ %F{34}Installation successful.%f%b" || \
+        print -P "%F{160}▓▒░ The clone has failed.%f%b"
+fi
+if [[ ! -f "$HOME/.zinit/bin/zinit.zsh" ]]; then
+    print -P "%F{160}▓▒░ FATAL: Zinit not found after install attempt. Check git/network.%f%b"
+    return 1
+fi
+source "$HOME/.zinit/bin/zinit.zsh"
+autoload -Uz _zinit
+(( ${+_comps} )) && _comps[zinit]=_zinit
+# Load a few important annexes, without Turbo
+# (this is currently required for annexes)
+zinit light-mode for \
+    zdharma-continuum/z-a-rust \
+    zdharma-continuum/z-a-as-monitor \
+    zdharma-continuum/z-a-patch-dl \
+    zdharma-continuum/z-a-bin-gem-node
+### End of Zinit's installer chunk
+# Two regular plugins loaded without tracking.
+zinit light zsh-users/zsh-autosuggestions
+zinit light zdharma-continuum/fast-syntax-highlighting
+zinit ice depth=1; zinit light romkatv/powerlevel10k
+
+# To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
+[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true
+
+# シェル上で日本語化けるの対策。 # sshでlinuxリモートで化ける時は、iterm2 から locale variable を送信しないように変更
+# export LANG=ja_JP.UTF-8
+# Easier to handle ssh etc
+export LANG=en_US.UTF-8
+
+# coatools @taiyodayo
+if [ -f ~/.mailab/coatools/coatools.sh ]; then
+    source ~/.mailab/coatools/coatools.sh
+fi
+
+# mai研究室用スクリプト
+export docker_host=$(hostname)
+export local_uid=$(id -u)
+export local_gid=$(id -g)
+export MAI_DEBUG="rstudio_gui"
+
+## Colorize the ls output (GNU ls vs BSD ls)
+{{ if eq .chezmoi.os "darwin" -}}
+alias ls='ls -G'
+{{ else -}}
+alias ls='ls --color=auto'
+{{ end -}}
+
+# mise — was previously appended imperatively by Mac + Ubuntu kitting scripts.
+command -v mise >/dev/null 2>&1 && eval "$(mise activate zsh)"
+
+# Rust toolchain (rustup writes ~/.cargo/env; sourcing it puts ~/.cargo/bin first on PATH)
+[[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
+
+{{ if eq .chezmoi.os "darwin" -}}
+# === Mac-only ===
+
+# GNU coreutils first on PATH (replaces the imperative append in mac/setup_cli_tools.sh).
+# brew_prefix is /opt/homebrew on Apple Silicon, /usr/local on Intel — try both.
+for _brew_prefix in /opt/homebrew /usr/local; do
+    for _gnu in coreutils findutils grep gnu-sed gnu-tar; do
+        _gnubin="$_brew_prefix/opt/$_gnu/libexec/gnubin"
+        [[ -d "$_gnubin" ]] && PATH="$_gnubin:$PATH"
+    done
+    _gnugetopt="$_brew_prefix/opt/gnu-getopt/bin"
+    [[ -d "$_gnugetopt" ]] && PATH="$_gnugetopt:$PATH"
+done
+unset _brew_prefix _gnu _gnubin _gnugetopt
+if [[ -d /opt/homebrew/opt/coreutils ]] || [[ -d /usr/local/opt/coreutils ]]; then
+    export USE_GNU_UTILS="true"
+fi
+
+# FVM + Homebrew Ruby + dart pub (was the ## BEGIN FVM/Ruby PATH block).
+export PATH="$HOME/.pub-cache/bin:$PATH"
+if command -v brew >/dev/null 2>&1; then
+    _ruby_prefix="$(brew --prefix)/opt/ruby/bin"
+    [[ -d "$_ruby_prefix" ]] && export PATH="$_ruby_prefix:$PATH"
+    unset _ruby_prefix
+fi
+[[ -d "$HOME/fvm/default/bin" ]] && export PATH="$PATH:$HOME/fvm/default/bin"
+alias ff='fvm flutter'
+
+# Android SDK (install from Android Studio SDK Manager separately)
+export ANDROID_SDK_ROOT="$HOME/Library/Android/sdk"
+[[ -d "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" ]] && \
+    export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
+[[ -d "$ANDROID_SDK_ROOT/platform-tools" ]] && \
+    export PATH="$ANDROID_SDK_ROOT/platform-tools:$PATH"
+
+# uv-managed Python 3.13 venv (~/p313/)
+[[ -f "$HOME/p313/bin/activate" ]] && source "$HOME/p313/bin/activate"
+{{ end -}}
+
+# mysettings custom CLI tools — replaces the imperative append in both kitting scripts.
+[[ -d "$HOME/mysettings/cli_tools" ]] && export PATH="$HOME/mysettings/cli_tools:$PATH"
+
+# マシン別の設定ファイルをソース
+[[ -f ~/.zlocal ]] && source ~/.zlocal
+
+# Installer additions that should survive `chezmoi apply` go here (NOT in ~/.zshrc).
+# See dotfiles/README.md for the convention.
+[[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
+
+# "tmux not working with git when ssh -A" issue. Only modify SSH_AUTH_SOCK when inside tmux
+if [ -n "$TMUX" ] && [ -S "$SSH_AUTH_SOCK" ]; then
+    # Only create/use symlink for tmux sessions
+    mkdir -p ~/.ssh
+    ln -sf "$SSH_AUTH_SOCK" ~/.ssh/ssh_auth_sock
+    export SSH_AUTH_SOCK=~/.ssh/ssh_auth_sock
+fi

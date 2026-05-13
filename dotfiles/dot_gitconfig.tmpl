@@ -1,0 +1,22 @@
+[user]
+	name = taiyo@{{ .chezmoi.hostname }} default
+	email = taiyodayo@gmail.com
+
+[credential]
+	# In-memory only (15 min TTL). Prevents accidental PAT pastes during
+	# `git clone https://...` from landing in plaintext on disk.
+	helper = cache
+
+[fetch]
+	# Auto-prune remote-deleted branch refs / tags on every fetch.
+	prune = true
+	pruneTags = true
+
+[pull]
+	# `git pull` rebases instead of merging, keeping history linear.
+	rebase = true
+
+[alias]
+	# `git sync` = fetch + prune remote-deleted refs + drop local branches whose
+	# upstream is gone. Depends on git-trim being on PATH (cargo install --locked git-trim).
+	sync = !git fetch --all --prune && git trim --no-confirm
