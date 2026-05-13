@@ -296,7 +296,14 @@ cargo install --locked git-trim
 # git のデフォルト
 git config --global user.name "taiyo@$(hostname) default"
 git config --global user.email "taiyodayo@gmail.com"
+# Stash creds in ~/.git-credentials (plaintext). Fine for single-user
+# kitted hosts where you're already trusting the box with SSH keys.
+git config --global credential.helper store
+# Auto-prune remote-deleted branch refs / tags on every fetch.
 git config --global fetch.prune true
+git config --global fetch.pruneTags true
+# `git pull` = rebase, not merge — keeps history linear.
+git config --global pull.rebase true
 # `git sync` = fetch + prune remote-deleted refs + drop local branches whose
 # upstream is gone. Depends on git-trim (installed via cargo above).
 git config --global alias.sync '!git fetch --all --prune && git trim --no-confirm'
