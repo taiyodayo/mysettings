@@ -296,9 +296,11 @@ cargo install --locked git-trim
 # git のデフォルト
 git config --global user.name "taiyo@$(hostname) default"
 git config --global user.email "taiyodayo@gmail.com"
-# Stash creds in ~/.git-credentials (plaintext). Fine for single-user
-# kitted hosts where you're already trusting the box with SSH keys.
-git config --global credential.helper store
+# Cache HTTPS creds in memory for 15 min (default). Prefer this over
+# `store` so an accidental PAT paste during `git clone https://...`
+# never hits disk. SSH-based auth (git@github.com:...) doesn't touch
+# credential.helper at all and is unaffected.
+git config --global credential.helper cache
 # Auto-prune remote-deleted branch refs / tags on every fetch.
 git config --global fetch.prune true
 git config --global fetch.pruneTags true
