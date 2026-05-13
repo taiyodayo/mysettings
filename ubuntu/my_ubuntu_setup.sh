@@ -28,8 +28,32 @@ else
 fi
 
 # apt - 全体でよく使うパッケージ
+# pkg-config + libssl-dev are build deps for typical Rust crates
+# (openssl-sys etc.); see rustup section in the userland block below.
+# bat / eza ship in apt; `cargo install`-only tools (git-trim) go via rustup.
 apt-get install -y zsh avahi-daemon parallel wireguard-tools nkf iftop iotop rclone lm-sensors \
-  build-essential
+  build-essential pkg-config libssl-dev bat eza
+
+# Debian/Ubuntu ship bat as /usr/bin/batcat (rename dodges a long-dead
+# package-name conflict). Add a `bat` symlink so the upstream-documented
+# command name works. Idempotent: only created if missing.
+if [ ! -e /usr/local/bin/bat ]; then
+    ln -s /usr/bin/batcat /usr/local/bin/bat
+fi
+
+# Remove any apt-managed Rust dev toolchain BEFORE the per-user rustup
+# install in the userland section below — otherwise the two toolchains
+# fight over PATH (apt's rustc/cargo land in /usr/bin which can shadow
+# ~/.cargo/bin depending on rc ordering). apt-get purge returns 0 even
+# if the packages aren't installed, so this is safe on a fresh box.
+#
+# NB: Ubuntu 26.04+ ships uutils coreutils (0.8.0) + sudo-rs as default
+# system binaries — statically built Rust binaries on PATH, NOT a dev
+# toolchain. Those stay. GNU fallbacks are available under gnu* names
+# (gnucp, gnutr, gnudate, gnusha256sum, ...) if a script trips on a
+# uutils flag difference. rustup is orthogonal to all of this and is
+# what you actually want for Rust development work.
+apt-get purge -y rustc cargo 2>/dev/null || true
 
 # mise (公式 apt リポジトリ - brew より apt が推奨)
 apt-get install -y gpg
@@ -242,6 +266,30 @@ mise use --global node@lts
 curl -LsSf https://astral.sh/uv/install.sh | sh
 # installer adds ~/.local/bin to PATH via shell profile; activate for this session
 export PATH="$HOME/.local/bin:$PATH"
+
+# rustup (公式インストーラー) — per-user Rust toolchain in ~/.cargo.
+# Idempotent: when rustup is already present we just self-update + update
+# the stable channel; otherwise run the official curl|sh installer. The
+# installer prepends ~/.cargo/bin to PATH via shell rc (its own logic is
+# grep-guarded so re-runs don't duplicate). System rustc/cargo (apt) were
+# purged in the root section above so they can't shadow ~/.cargo/bin.
+# 詳細: https://rustup.rs
+if command -v rustup >/dev/null 2>&1; then
+    rustup self update
+    rustup update stable
+else
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+      | sh -s -- -y --default-toolchain stable
+fi
+# Activate cargo env for the rest of this here-doc so `cargo install` is
+# resolvable immediately (not just in future login shells).
+# shellcheck source=/dev/null
+[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
+
+# cargo-installed CLIs. `cargo install` is idempotent: it skips when the
+# requested version is already installed and rebuilds only on upgrade.
+# --locked uses the crate's pinned Cargo.lock for deterministic builds.
+cargo install --locked git-trim
 
 # git のデフォルト
 git config --global user.name "taiyo@$(hostname) default"
