@@ -347,6 +347,14 @@ if [ ! -f ~/.zshrc ] || ! grep -Fq 'mysettings/cli_tools' ~/.zshrc; then
 fi
 export PATH="$HOME/mysettings/cli_tools:$PATH"
 
+# Consolidated login check (gh, claude, codex, gemini). stdin is a here-doc
+# here, so login_check.sh runs in non-interactive mode — it reports status
+# and prints the commands to run, without blocking the kitting flow. Run
+# `login_check.sh` from an interactive shell afterward to actually log in.
+if [ -x "$HOME/mysettings/cli_tools/login_check.sh" ]; then
+    "$HOME/mysettings/cli_tools/login_check.sh"
+fi
+
 # taiyo 実行ここまで
 EOF
 
