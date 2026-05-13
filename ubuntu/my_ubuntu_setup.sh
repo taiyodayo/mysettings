@@ -88,18 +88,42 @@ if ! grep -qF 'vm.swappiness=10' /etc/sysctl.conf 2>/dev/null; then
 fi
 sysctl -p
 
-# # docker-ce の部
-# apt-get install -y apt-transport-https ca-certificates curl software-properties-common
-# curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-# echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-# apt update
-# apt-cache policy docker-ce
-# apt-get install -y docker-ce
-# # sudo systemctl status docker
-# # docker-compose を使わないと mailab のコンテナと互換性が無いのに注意 `docker compose` への対応は先送り中
-# apt-get install -y docker-compose
+# Docker — install docker-ce from Docker Inc's official apt repo. Ubuntu's
+# docker.io lags several major versions by mid-LTS cycle; docker-ce is on
+# a current release cadence and is what the lab actually wants.
+# Mirrors upstream: https://docs.docker.com/engine/install/ubuntu/
 
-apt-get install -y docker.io docker-compose-plugin
+# Remove Ubuntu-bundled / legacy Docker packages so they can't conflict on
+# file ownership of /usr/bin/docker etc. Includes anything an older run of
+# this script may have installed. apt-get purge returns 0 even when the
+# packages aren't installed, so this is safe on a fresh box.
+apt-get purge -y docker.io docker-doc docker-compose docker-compose-v2 \
+    podman-docker containerd runc 2>/dev/null || true
+
+# Docker's official GPG key + apt repo (modern /etc/apt/keyrings/ path).
+apt-get install -y ca-certificates curl
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+    -o /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" \
+    > /etc/apt/sources.list.d/docker.list
+
+apt-get update
+# docker-ce             — Engine
+# docker-ce-cli         — CLI
+# containerd.io         — Docker Inc's containerd build (replaces Ubuntu's
+#                         `containerd` package, which we purged above)
+# docker-buildx-plugin  — `docker buildx`
+# docker-compose-plugin — `docker compose` v2 plugin (NOT the legacy v1
+#                         `docker-compose` binary; install that separately
+#                         via pip or apt if a workload still requires it)
+apt-get install -y docker-ce docker-ce-cli containerd.io \
+    docker-buildx-plugin docker-compose-plugin
+
+# Both docker.io and docker-ce auto-enable docker.service via postinst, but
+# we set it explicitly in case of unusual install orderings on re-runs.
+systemctl enable --now docker
 
 # ユーザを docker グループに追加
 usermod -aG docker "${SUDO_USER}"
