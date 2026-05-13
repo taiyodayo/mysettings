@@ -43,10 +43,12 @@ apt-get update && apt-get install -y mise
 
 # gh (GitHub CLI) — 公式 apt リポジトリ。Ubuntu 同梱の gh は古いので、
 # 公式リポを優先させて常に最新を取得する。
-# 詳細: https://github.com/cli/cli/blob/trunk/docs/install_linux.md
+# Mirrors upstream verbatim (minus sudo, since this script already runs as root):
+# https://github.com/cli/cli/blob/trunk/docs/install_linux.md
+type -p wget >/dev/null || apt-get install -y wget
 mkdir -p -m 755 /etc/apt/keyrings
-wget -nv -O /etc/apt/keyrings/githubcli-archive-keyring.gpg \
-  https://cli.github.com/packages/githubcli-archive-keyring.gpg
+out=$(mktemp) && wget -nv -O"$out" https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+  && cat "$out" > /etc/apt/keyrings/githubcli-archive-keyring.gpg
 chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
 mkdir -p -m 755 /etc/apt/sources.list.d
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
