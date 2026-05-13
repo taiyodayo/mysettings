@@ -297,6 +297,9 @@ cargo install --locked git-trim
 git config --global user.name "taiyo@$(hostname) default"
 git config --global user.email "taiyodayo@gmail.com"
 git config --global fetch.prune true
+# `git sync` = fetch + prune remote-deleted refs + drop local branches whose
+# upstream is gone. Depends on git-trim (installed via cargo above).
+git config --global alias.sync '!git fetch --all --prune && git trim --no-confirm'
 
 # netdata
 # wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && \
