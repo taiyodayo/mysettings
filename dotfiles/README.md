@@ -4,14 +4,14 @@ This directory is the [chezmoi](https://chezmoi.io) source for files that land i
 
 ## Layout
 
-| Source file (here)        | Deployed as       | Notes |
-|---------------------------|-------------------|-------|
-| `dot_zshrc.tmpl`          | `~/.zshrc`        | absorbs all 8 imperative kitting-script appends as runtime conditionals |
-| `dot_p10k.zsh`            | `~/.p10k.zsh`     | verbatim copy of `_p10k.zsh` (no template needed) |
-| `dot_gitconfig.tmpl`      | `~/.gitconfig`    | hostname is templated via `.chezmoi.hostname` |
-| `dot_zprofile.tmpl`       | `~/.zprofile`     | linuxbrew shellenv on Ubuntu, empty on Mac |
+| Source file (here)             | Deployed as       | Notes |
+|--------------------------------|-------------------|-------|
+| `dot_zshrc.tmpl`               | `~/.zshrc`        | absorbs all 8 imperative kitting-script appends as runtime conditionals. Cross-platform Flutter/bun blocks plus Mac-only block for GNU coreutils, dart pub, Android SDK, p313 venv |
+| `dot_p10k.zsh`                 | `~/.p10k.zsh`     | verbatim copy of `_p10k.zsh` (no template needed) |
+| `modify_dot_gitconfig.tmpl`    | `~/.gitconfig`    | **surgical** — uses `git config -f` to set canonical keys only, preserves everything else (e.g. `gh auth setup-git`'s per-host credential helpers stay intact) |
+| `dot_zprofile.tmpl`            | `~/.zprofile`     | linuxbrew shellenv on Ubuntu, empty on Mac |
 
-Filename convention: `dot_foo` → `~/.foo`; `.tmpl` suffix marks files that go through chezmoi's Go template engine.
+Filename convention: `dot_foo` → `~/.foo`; `.tmpl` suffix marks files that go through chezmoi's Go template engine; `modify_` prefix marks an executable script that gets the current target file on stdin and emits the new content on stdout — used here so we can do partial edits to `~/.gitconfig` instead of full-file replacement.
 
 ## Daily workflow
 

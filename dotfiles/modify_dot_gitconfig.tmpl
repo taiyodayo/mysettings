@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Surgical modify_ script for ~/.gitconfig.
+#
+# chezmoi runs this with the CURRENT ~/.gitconfig content piped to stdin.
+# Whatever this prints to stdout becomes the new ~/.gitconfig. By using
+# `git config -f` to set canonical keys (rather than overwriting the whole
+# file via a template), we leave everything else untouched — including
+# per-host helpers like:
+#
+#   [credential "https://github.com"]
+#       helper =
+#       helper = !/usr/bin/gh auth git-credential
+#
+# which `gh auth setup-git` writes locally. A template-style replacement
+# clobbers those; this surgical approach preserves them.
+#
+# Re-runnable: `git config -f` is idempotent — setting a key to its
+# existing value is a no-op rewrite, and chezmoi compares the output
+# byte-for-byte before deciding whether to update the destination.
+
+set -euo pipefail
+
+tmp=$(mktemp)
+trap 'rm -f "$tmp"' EXIT
+
+# Read current ~/.gitconfig (may be empty on a fresh box; that's fine).
+cat > "$tmp"
+
+# Canonical keys we own:
+git config -f "$tmp" user.name        "taiyo@{{ .chezmoi.hostname }} default"
+git config -f "$tmp" user.email       "taiyodayo@gmail.com"
+
+# In-memory credential cache for non-gh-managed URLs. The per-URL
+# credential.https://github.com.helper that `gh auth setup-git` writes
+# overrides this for github.com / gist.github.com clones — unchanged.
+git config -f "$tmp" credential.helper  cache
+
+# Auto-clean remote-deleted refs and tags on every fetch.
+git config -f "$tmp" fetch.prune        true
+git config -f "$tmp" fetch.pruneTags    true
+
+# git pull = rebase, not merge.
+git config -f "$tmp" pull.rebase        true
+
+# `git sync` — fetch + prune + drop local branches whose upstream is gone.
+# Depends on git-trim being on PATH (cargo install --locked git-trim).
+git config -f "$tmp" alias.sync         '!git fetch --all --prune && git trim --no-confirm'
+
+cat "$tmp"
