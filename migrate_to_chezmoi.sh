@@ -55,12 +55,21 @@ if ! command -v chezmoi >/dev/null 2>&1; then
             brew install chezmoi
             ;;
         Linux)
-            if command -v apt-get >/dev/null 2>&1; then
-                sudo apt-get update && sudo apt-get install -y chezmoi
+            # Prefer apt if it has chezmoi (Ubuntu 24.04+ jammy w/ universe, etc.).
+            # Fall back to chezmoi's official one-line installer when apt doesn't
+            # have it (Ubuntu 22.04 default repos, non-Debian distros). The
+            # installer drops a static binary at ~/.local/bin/chezmoi — no sudo
+            # required, and ~/.local/bin is already on PATH via _zshrc.
+            if command -v apt-get >/dev/null 2>&1 \
+                && sudo apt-get update >/dev/null \
+                && apt-cache show chezmoi >/dev/null 2>&1; then
+                sudo apt-get install -y chezmoi
             else
-                echo "ERROR: only brew (Mac) and apt (Debian/Ubuntu) are supported here." >&2
-                echo "Install chezmoi manually: https://www.chezmoi.io/install/" >&2
-                exit 1
+                echo "chezmoi not in apt — using official installer to ~/.local/bin/"
+                sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
+                # Add ~/.local/bin to PATH for the remainder of THIS script run.
+                # _zshrc already puts it on PATH for future interactive shells.
+                export PATH="$HOME/.local/bin:$PATH"
             fi
             ;;
         *)
