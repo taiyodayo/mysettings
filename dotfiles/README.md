@@ -38,6 +38,24 @@ git diff dotfiles/          # review what got captured before committing
 
 Neither file is touched by chezmoi.
 
+## ~/.p10k.zsh policy
+
+The `dot_p10k.zsh` template is **authoritative** — the canonical lab prompt style lives in the repo. `chezmoi apply` intentionally overwrites any local `p10k configure` customizations to keep the prompt uniform across machines.
+
+If you change the prompt style and want it propagated to all machines:
+
+```bash
+p10k configure              # tweak it on one machine
+chezmoi add ~/.p10k.zsh     # capture into dotfiles/dot_p10k.zsh
+cd ~/mysettings && git diff dotfiles/dot_p10k.zsh   # review
+git add dotfiles/ && git commit && git push
+# Other machines: git pull && chezmoi apply
+```
+
+If you want a one-off per-machine prompt tweak: put it in `~/.zlocal` (which is sourced AFTER `~/.p10k.zsh` in `~/.zshrc` so overrides take effect).
+
+`migrate_to_chezmoi.sh` always backs up the existing `~/.p10k.zsh` to `~/.dotfiles_backup.<ts>/.p10k.zsh` before applying, so recovery is `cp -a ~/.dotfiles_backup.<ts>/.p10k.zsh ~/.p10k.zsh`.
+
 ## Secrets / tokens
 
 **Do not commit secrets.** This source directory is in `~/mysettings/`, which is a public-ish git repo.

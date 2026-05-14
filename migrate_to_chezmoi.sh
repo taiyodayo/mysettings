@@ -19,6 +19,29 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_SOURCE="$SCRIPT_DIR/dotfiles"
 
+# Track backup state globally so the ERR trap can print restore commands
+# regardless of where the script failed.
+backup_dir=""
+backed_up=()
+
+restore_on_failure() {
+    local rc=$?
+    [ "$rc" -eq 0 ] && return
+    echo "" >&2
+    echo "*** Migration failed (exit $rc)." >&2
+    if [ -n "$backup_dir" ] && [ "${#backed_up[@]}" -gt 0 ]; then
+        echo "*** Restore your previous dotfiles with:" >&2
+        for f in "${backed_up[@]}"; do
+            echo "    cp -a '$backup_dir/$f' '$HOME/$f'" >&2
+        done
+    elif [ -n "$backup_dir" ]; then
+        echo "*** Backup dir: $backup_dir (empty)" >&2
+    else
+        echo "*** No backup was made — your existing dotfiles are unchanged." >&2
+    fi
+}
+trap restore_on_failure ERR
+
 if [ ! -d "$DOTFILES_SOURCE" ]; then
     echo "ERROR: chezmoi source dir not found at $DOTFILES_SOURCE" >&2
     echo "Pull the latest from the mysettings repo and try again." >&2
@@ -28,7 +51,6 @@ fi
 # ---- 1. Snapshot existing dotfiles -----------------------------------------
 backup_dir="$HOME/.dotfiles_backup.$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$backup_dir"
-backed_up=()
 for f in .zshrc .p10k.zsh .gitconfig .zprofile .zshenv .zlocal .zshrc.local; do
     if [ -e "$HOME/$f" ]; then
         cp -a "$HOME/$f" "$backup_dir/"
@@ -55,17 +77,23 @@ if ! command -v chezmoi >/dev/null 2>&1; then
             brew install chezmoi
             ;;
         Linux)
-            # Prefer apt if it has chezmoi (Ubuntu 24.04+ jammy w/ universe, etc.).
-            # Fall back to chezmoi's official one-line installer when apt doesn't
-            # have it (Ubuntu 22.04 default repos, non-Debian distros). The
-            # installer drops a static binary at ~/.local/bin/chezmoi — no sudo
-            # required, and ~/.local/bin is already on PATH via _zshrc.
+            # Prefer apt if (a) apt-get exists, (b) we have passwordless sudo
+            # (no prompt = clean fall-through for users without sudo rights,
+            # e.g. throwaway test accounts), and (c) apt has a chezmoi package.
+            # Fall back to chezmoi's official one-line installer otherwise
+            # (Ubuntu 22.04 default repos, non-Debian distros, no-sudo users).
+            # The installer drops a static binary at ~/.local/bin/chezmoi —
+            # no sudo required, and ~/.local/bin is on PATH via _zshrc.
             if command -v apt-get >/dev/null 2>&1 \
+                && sudo -n true 2>/dev/null \
                 && sudo apt-get update >/dev/null \
                 && apt-cache show chezmoi >/dev/null 2>&1; then
                 sudo apt-get install -y chezmoi
             else
-                echo "chezmoi not in apt — using official installer to ~/.local/bin/"
+                echo "chezmoi not installable via apt (or no passwordless sudo) — using official installer to ~/.local/bin/"
+                # The chezmoi installer doesn't always mkdir its install dir;
+                # ensure ~/.local/bin exists before the curl call.
+                mkdir -p "$HOME/.local/bin"
                 sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
                 # Add ~/.local/bin to PATH for the remainder of THIS script run.
                 # _zshrc already puts it on PATH for future interactive shells.
@@ -84,13 +112,21 @@ fi
 # ---- 3. Configure chezmoi to read from this repo's dotfiles/ ---------------
 mkdir -p "$HOME/.config/chezmoi"
 config_file="$HOME/.config/chezmoi/chezmoi.toml"
-cat > "$config_file" <<EOF
+expected_config=$(cat <<EOF
 # Written by ~/mysettings/migrate_to_chezmoi.sh.
 # sourceDir tells chezmoi where to find our templates instead of the default
 # ~/.local/share/chezmoi/. Edit if you move the mysettings repo.
 sourceDir = "$DOTFILES_SOURCE"
 EOF
-echo "Wrote $config_file"
+)
+# Only overwrite if missing or different — preserves any chezmoi.toml
+# additions (template data, encryption config, etc.) the user has made.
+if [ ! -f "$config_file" ] || [ "$(cat "$config_file")" != "$expected_config" ]; then
+    printf '%s\n' "$expected_config" > "$config_file"
+    echo "Wrote $config_file"
+else
+    echo "$config_file already correct — no change"
+fi
 
 # ---- 4. Apply --------------------------------------------------------------
 echo "Running chezmoi apply..."
