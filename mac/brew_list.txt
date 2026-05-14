@@ -48,3 +48,4 @@ ruby
 cocoapods
 direnv
 dockutil
+bun
