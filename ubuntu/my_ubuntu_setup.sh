@@ -93,6 +93,51 @@ sysctl -p
 # a current release cadence and is what the lab actually wants.
 # Mirrors upstream: https://docs.docker.com/engine/install/ubuntu/
 
+# Pre-flight: detect docker.io currently installed AND running containers.
+# Switching docker.io → docker-ce purges then reinstalls the engine, which
+# briefly stops all containers. Storage in /var/lib/docker survives, but
+# containers without --restart=always do NOT auto-restart. On production
+# hosts this is a deliberate operation requiring explicit consent.
+DO_DOCKER_MIGRATION=1
+if dpkg -l docker.io 2>/dev/null | grep -q '^ii'; then
+    running=""
+    if command -v docker >/dev/null 2>&1; then
+        running=$(docker ps --format '{{.Names}}' 2>/dev/null | tr '\n' ' ')
+    fi
+    if [ -n "$running" ]; then
+        count=$(echo "$running" | wc -w)
+        echo ""
+        echo "*** docker-ce migration warning ***"
+        echo ""
+        echo "  docker.io is installed and has $count running container(s):"
+        echo "    $running"
+        echo ""
+        echo "  Continuing will: apt-get purge docker.io (stops all containers) →"
+        echo "                   install docker-ce → containers can be restarted."
+        echo "  Containers without --restart=always will NOT auto-restart."
+        echo ""
+        if [ -t 0 ]; then
+            echo "  Press ENTER to continue with docker-ce migration, or any other key to skip."
+            read -r -n 1 -s docker_key
+            echo ""
+            if [ "$docker_key" = "" ]; then
+                echo "  Continuing with docker-ce migration..."
+            else
+                echo "  Skipping Docker section. docker.io remains installed."
+                echo "  Re-run this script when ready to migrate."
+                DO_DOCKER_MIGRATION=0
+            fi
+        else
+            # Non-interactive (CI / piped). Proceed but log loudly so the
+            # operator sees the warning in the output.
+            echo "  (non-interactive shell — proceeding with migration. Containers will stop briefly.)"
+        fi
+    else
+        echo "Note: docker.io installed but no containers running. Proceeding with docker-ce migration."
+    fi
+fi
+
+if [ $DO_DOCKER_MIGRATION -eq 1 ]; then
 # Remove Ubuntu-bundled / legacy Docker packages so they can't conflict on
 # file ownership of /usr/bin/docker etc. Includes anything an older run of
 # this script may have installed. apt-get purge returns 0 even when the
@@ -124,8 +169,9 @@ apt-get install -y docker-ce docker-ce-cli containerd.io \
 # Both docker.io and docker-ce auto-enable docker.service via postinst, but
 # we set it explicitly in case of unusual install orderings on re-runs.
 systemctl enable --now docker
+fi  # end DO_DOCKER_MIGRATION
 
-# ユーザを docker グループに追加
+# ユーザを docker グループに追加 — always run, group exists for both docker.io and docker-ce
 usermod -aG docker "${SUDO_USER}"
 # # デフォルトのインセキュアレジストリを追加
 # if [ ! -f /etc/docker/daemon.json ]; then
