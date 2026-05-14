@@ -134,6 +134,18 @@ if [ ! -f ~/.zshrc ] || ! grep -Fq 'mysettings/cli_tools' ~/.zshrc; then
 fi
 export PATH="$HOME/mysettings/cli_tools:$PATH"
 
+# Consolidated login check (gh, claude, codex, gemini) — reports auth status.
+if [ -x "$SCRIPT_DIR/cli_tools/login_check.sh" ]; then
+    "$SCRIPT_DIR/cli_tools/login_check.sh"
+fi
+
+# Consolidated tool consistency audit. Reports non-canonical installs +
+# duplicates of managed CLI tools. Re-run with --fix to auto-purge user-owned
+# duplicates. See cli_tools/check_tools.sh --help.
+if [ -x "$SCRIPT_DIR/cli_tools/check_tools.sh" ]; then
+    "$SCRIPT_DIR/cli_tools/check_tools.sh"
+fi
+
 # Display messages
 echo "=========================================="
 echo "✓ Setup complete!"

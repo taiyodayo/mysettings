@@ -293,6 +293,16 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # installer adds ~/.local/bin to PATH via shell profile; activate for this session
 export PATH="$HOME/.local/bin:$PATH"
 
+# bun — JavaScript runtime + package manager. cli_tools/llms_update.sh uses
+# `bun add -g` for codex and gemini, so bun must be on PATH before that runs.
+# bun's installer is idempotent: detects existing install, upgrades in place.
+if ! command -v bun >/dev/null 2>&1; then
+    curl -fsSL https://bun.sh/install | bash
+fi
+# Activate for this session (installer adds ~/.bun/bin to .zshrc, but not
+# the current shell). dot_zshrc.tmpl picks it up via `[ -d "$HOME/.bun" ]`.
+[ -d "$HOME/.bun" ] && export PATH="$HOME/.bun/bin:$PATH"
+
 # rustup (公式インストーラー) — per-user Rust toolchain in ~/.cargo.
 # Idempotent: when rustup is already present we just self-update + update
 # the stable channel; otherwise run the official curl|sh installer. The
@@ -353,6 +363,14 @@ export PATH="$HOME/mysettings/cli_tools:$PATH"
 # `login_check.sh` from an interactive shell afterward to actually log in.
 if [ -x "$HOME/mysettings/cli_tools/login_check.sh" ]; then
     "$HOME/mysettings/cli_tools/login_check.sh"
+fi
+
+# Consolidated tool consistency audit. Reports non-canonical installs +
+# duplicates of managed CLI tools. Read-only by default. Re-run with --fix
+# afterward to auto-purge user-owned duplicates (bat in ~/.cargo, claude in
+# ~/.bun, etc.) — see cli_tools/check_tools.sh --help.
+if [ -x "$HOME/mysettings/cli_tools/check_tools.sh" ]; then
+    "$HOME/mysettings/cli_tools/check_tools.sh"
 fi
 
 # taiyo 実行ここまで
