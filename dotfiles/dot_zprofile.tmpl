@@ -1,8 +1,11 @@
-{{ if ne .chezmoi.os "darwin" -}}
-# Linuxbrew's installer convention puts shellenv here so login shells have brew on PATH.
-# ~/.zshrc also sources brew via the bootstrap loop, so this is mostly belt-and-suspenders
-# for login shells that don't read ~/.zshrc.
-if [ -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
-    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-fi
-{{ end -}}
+# brew shellenv for LOGIN shells, which read ~/.zprofile but NOT ~/.zshrc.
+# Mirrors the brew bootstrap loop in dot_zshrc.tmpl so non-interactive logins
+# (e.g. `ssh user@host cmd`) still get brew on PATH. The loop tries Apple
+# Silicon (/opt/homebrew), Intel Mac (/usr/local), and linuxbrew
+# (/home/linuxbrew) in order — picks whichever exists.
+for brew_path in /opt/homebrew/bin/brew /usr/local/bin/brew /home/linuxbrew/.linuxbrew/bin/brew; do
+    if [ -x "$brew_path" ]; then
+        eval "$($brew_path shellenv)"
+        break
+    fi
+done
