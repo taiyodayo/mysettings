@@ -37,8 +37,8 @@ echo ""
 # 開発用レポはここに！！！！ 古いツールがバカ面倒になる時がある
 mkdir -p ~/dev
 
-# zsh周りの基本設定
-source ./setup_zsh_and_keys.sh
+# zsh周りの基本設定 (cross-platform — lives in common/)
+source ./common/setup_zsh_and_keys.sh
 
 # homebrew 他を設定
 source ./mac/setup_cli_tools.sh

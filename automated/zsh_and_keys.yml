@@ -1,6 +1,6 @@
 ---
-# Replaces setup_zsh_and_keys.sh (Linux side only — Mac kitting will live
-# in a separate directory later).
+# Replaces common/setup_zsh_and_keys.sh (Linux side only — Mac kitting
+# uses the shell script directly via setup_mailab_mac.sh).
 #
 # Usage:
 #   make zsh                          # zsh setup, no key import
