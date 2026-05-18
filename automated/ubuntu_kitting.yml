@@ -614,7 +614,11 @@
             - (r_check.rc | default(0)) != 0
 
     # ---- pinned ghostscript + ImageMagick 7 ----
-    # gs 10 has a PDF mojibake bug for Japanese; pin to 9.55.
+    # gs 10 has a PDF mojibake bug for Japanese; pin to 9.55 when available.
+    # ghostscript_pinned is the jammy (22.04) build — on noble/oracular/resolute
+    # the candidate moves to 10.x and the exact pin disappears from apt. We try
+    # the pin first; if apt has no matching candidate, fall back to the default
+    # apt candidate and warn that the mojibake fix isn't in effect.
     # Ubuntu 26.04+ ships ImageMagick 7 in apt, so no IMEI source build needed.
 
     - name: Install pinned ghostscript, PDF tools, and ImageMagick
@@ -626,6 +630,27 @@
           - imagemagick
         state: present
         allow_downgrade: true
+      register: gs_pinned
+      failed_when: false
+
+    - name: Fall back to unpinned ghostscript when the pin isn't a candidate
+      ansible.builtin.apt:
+        name:
+          - ghostscript
+          - qpdf
+          - mupdf
+          - imagemagick
+        state: present
+      when: gs_pinned is failed
+
+    - name: Warn when ghostscript pin unavailable (Japanese PDF mojibake fix not applied)
+      ansible.builtin.debug:
+        msg: |
+          WARNING: ghostscript={{ ghostscript_pinned }} not available on this release.
+          Installed the default apt candidate instead — Japanese PDF mojibake fix is NOT in effect.
+          If you process Japanese PDFs, pin gs 9.55 manually (e.g. download the jammy .deb)
+          or accept gs 10's behavior.
+      when: gs_pinned is failed
 
 
 - name: Ubuntu server kitting — user layer
