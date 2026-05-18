@@ -551,13 +551,26 @@
             state: absent
           when: not (r_apt_install.failed | default(false))
 
+        # Strip the older Ansible-default-style marker that earlier versions
+        # of this playbook wrote. Without this, hosts that ran a previous
+        # version end up with both blocks side-by-side after a re-kit.
+        - name: Strip older Ansible-style mysettings R config marker block
+          ansible.builtin.blockinfile:
+            path: /etc/R/Rprofile.site
+            marker: "# {mark} ANSIBLE MANAGED BLOCK - mysettings R config"
+            state: absent
+          when: not (r_apt_install.failed | default(false))
+
+        # Marker format matches what cli_tools/check_r.sh greps for
+        # (`# === BEGIN mysettings R config ===`). Without this exact shape
+        # check_r.sh reports the block as missing even though it's present.
         - name: Configure /etc/R/Rprofile.site (bspm + install_apt helper)
           when: not (r_apt_install.failed | default(false))
           ansible.builtin.blockinfile:
             path: /etc/R/Rprofile.site
             create: true
             mode: "0644"
-            marker: "# {mark} ANSIBLE MANAGED BLOCK - mysettings R config"
+            marker: "# === {mark} mysettings R config ==="
             block: |
               # Root R: bspm enabled → install.packages() via apt to system lib.
               if (Sys.info()[["effective_user"]] == "root") {
