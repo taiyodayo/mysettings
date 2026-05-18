@@ -109,6 +109,16 @@
       community.general.snap:
         name: yq
         state: present
+      # Tolerant: snapd may not be ready immediately after install on
+      # minimal images, or may be unavailable in containers (LXD/Docker).
+      # Other apt-managed tools are unaffected — let the playbook continue.
+      register: snap_yq
+      ignore_errors: true
+
+    - name: Warn if yq snap install failed
+      ansible.builtin.debug:
+        msg: "WARNING: yq snap install failed — continuing without yq. Install manually later: snap install yq"
+      when: snap_yq.failed | default(false)
 
     # Purge apt rustc/cargo BEFORE the per-user rustup install in the user
     # block — otherwise apt's rustc/cargo (under /usr/bin) can shadow
@@ -155,7 +165,7 @@
 
     - name: Add mise apt repo
       ansible.builtin.apt_repository:
-        repo: "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch={{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}] https://mise.jdx.dev/deb stable main"
+        repo: "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch={{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'amd64' }}] https://mise.jdx.dev/deb stable main"
         filename: mise
         state: present
 
@@ -178,7 +188,7 @@
 
     - name: Add gh apt repo
       ansible.builtin.apt_repository:
-        repo: "deb [arch={{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }} signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main"
+        repo: "deb [arch={{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'amd64' }} signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main"
         filename: github-cli
         state: present
 
@@ -212,7 +222,7 @@
 
     - name: Add Dart apt repo
       ansible.builtin.apt_repository:
-        repo: "deb [signed-by=/etc/apt/keyrings/dart.gpg arch={{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}] https://storage.googleapis.com/download.dartlang.org/linux/debian stable main"
+        repo: "deb [signed-by=/etc/apt/keyrings/dart.gpg arch={{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'amd64' }}] https://storage.googleapis.com/download.dartlang.org/linux/debian stable main"
         filename: dart_stable
         state: present
 
@@ -295,9 +305,9 @@
     - name: Add Docker apt repo
       ansible.builtin.apt_repository:
         repo: >-
-          deb [arch={{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}
+          deb [arch={{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'amd64' }}
           signed-by=/etc/apt/keyrings/docker.asc]
-          https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+          https://download.docker.com/linux/ubuntu {{ ansible_facts['distribution_release'] }} stable
         filename: docker
         state: present
       when: do_docker_migration
@@ -348,11 +358,39 @@
       when: mailab_ca.changed
 
     # ---- netdata ----
+    # netdata was removed from Ubuntu's universe repo in 24.04 (noble) and
+    # later — apt install can't find it. Use netdata's official kickstart.sh
+    # which sets up netdata's own apt repo and installs from there. Works on
+    # 22.04, 24.04, 26.04. Idempotent via stat check on the binary.
 
-    - name: Install netdata
-      ansible.builtin.apt:
-        name: netdata
-        state: present
+    - name: Check if netdata is already installed
+      ansible.builtin.stat:
+        path: /usr/sbin/netdata
+      register: netdata_check
+
+    - name: Install netdata via official kickstart
+      # --non-interactive: no prompts (CI / kitting-safe)
+      # --stable-channel: stable release (not nightly)
+      # --disable-telemetry: don't phone home anonymously
+      # --dont-wait: don't block waiting for the service to settle
+      # No --claim-* flags → no registration with netdata cloud
+      ansible.builtin.shell: |
+        set -o pipefail
+        curl -fsSL https://get.netdata.cloud/kickstart.sh \
+          | bash -s -- --non-interactive --stable-channel --disable-telemetry --dont-wait
+      args:
+        executable: /bin/bash
+      when: not netdata_check.stat.exists
+      # Tolerant: netdata is a nice-to-have monitor, not a hard kitting
+      # dep. Kickstart can fail on minimal images / containers / network
+      # blips; let the rest of the playbook complete.
+      register: netdata_install
+      ignore_errors: true
+
+    - name: Warn if netdata install failed
+      ansible.builtin.debug:
+        msg: "WARNING: netdata install failed — continuing without it. Re-run kit or `curl -fsSL https://get.netdata.cloud/kickstart.sh | bash` later."
+      when: netdata_install.failed | default(false)
 
     # ---- R via r2u (binary CRAN packages from Ubuntu apt) ----
     # r2u only ships repos for current Ubuntu LTS. The whole block is gated
@@ -371,8 +409,8 @@
     - name: Skip R install on non-LTS
       ansible.builtin.debug:
         msg: >-
-          Skipping r2u-based R install — {{ ansible_distribution }}
-          {{ ansible_distribution_version }} is not LTS. r2u supports LTS only.
+          Skipping r2u-based R install — {{ ansible_facts['distribution'] }}
+          {{ ansible_facts['distribution_version'] }} is not LTS. r2u supports LTS only.
       when: not is_lts
 
     - name: Install R via r2u
@@ -387,7 +425,7 @@
 
         - name: Add r2u apt repo (r-cran-* binary debs)
           ansible.builtin.apt_repository:
-            repo: "deb [arch=amd64] https://r2u.stat.illinois.edu/ubuntu {{ ansible_distribution_release }} main"
+            repo: "deb [arch=amd64] https://r2u.stat.illinois.edu/ubuntu {{ ansible_facts['distribution_release'] }} main"
             filename: cranapt
             state: present
             update_cache: false
@@ -404,7 +442,7 @@
 
         - name: Add Marutter CRAN apt repo (current r-base / r-base-core)
           ansible.builtin.apt_repository:
-            repo: "deb https://cloud.r-project.org/bin/linux/ubuntu {{ ansible_distribution_release }}-cran40/"
+            repo: "deb https://cloud.r-project.org/bin/linux/ubuntu {{ ansible_facts['distribution_release'] }}-cran40/"
             filename: cran_r
             state: present
             update_cache: true
@@ -552,7 +590,7 @@
     # evaluates on the controller in the invoker's context, ignoring become.
     target_user: "{{ lookup('env', 'SUDO_USER') | default(lookup('env', 'USER'), true) }}"
     user_home: "/home/{{ target_user }}"
-    git_user_name: "taiyo@{{ ansible_hostname }} default"
+    git_user_name: "taiyo@{{ ansible_facts['hostname'] }} default"
     git_user_email: "taiyodayo@gmail.com"
 
   tasks:
@@ -639,6 +677,9 @@
     # cargo-installed CLIs not packaged in apt. `cargo install` is idempotent
     # (skips when the requested version is already installed; rebuilds only on
     # upgrade). --locked uses the crate's pinned Cargo.lock.
+    # Tolerant per-item: each cargo install is heavy (qsv ≈ 10 min, can OOM
+    # on small VMs, can fail on missing system libs). A single crate failing
+    # shouldn't block the others or the rest of the playbook.
     - name: Install cargo CLIs (git-trim, du-dust, jless, zellij, qsv)
       become_user: "{{ target_user }}"
       ansible.builtin.shell: |
@@ -647,6 +688,8 @@
       args:
         executable: /bin/bash
         creates: "{{ user_home }}/.cargo/bin/{{ item.binary }}"
+      register: cargo_installs
+      ignore_errors: true
       loop:
         - { crate: git-trim, binary: git-trim }
         - { crate: du-dust, binary: dust }
@@ -657,6 +700,9 @@
     # fvm — Flutter Version Manager. Dart SDK comes from Google's apt repo
     # (system block above). fvm lives at ~/.pub-cache/bin/fvm; dot_zshrc.tmpl
     # picks it up via `[[ -d "$HOME/.pub-cache/bin" ]] && export PATH=...`.
+    # Tolerant: fvm is only needed for Flutter work. `fvm install stable`
+    # downloads ~500MB and frequently hits network blips. The whole block
+    # is non-blocking — kit completes without Flutter on slow/flaky links.
     - name: Activate fvm via dart pub global
       become_user: "{{ target_user }}"
       ansible.builtin.command: dart pub global activate fvm
@@ -664,9 +710,9 @@
         creates: "{{ user_home }}/.pub-cache/bin/fvm"
       environment:
         PATH: "/usr/lib/dart/bin:{{ user_home }}/.pub-cache/bin:/usr/bin:/bin"
+      register: fvm_activate
+      ignore_errors: true
 
-    # `fvm install stable` downloads ~500MB of Flutter SDK — gate on creates:
-    # so re-kits are fast.
     - name: Install Flutter stable via fvm
       become_user: "{{ target_user }}"
       ansible.builtin.command: fvm install stable
@@ -674,6 +720,9 @@
         creates: "{{ user_home }}/fvm/versions/stable"
       environment:
         PATH: "{{ user_home }}/.pub-cache/bin:/usr/lib/dart/bin:/usr/bin:/bin"
+      when: not (fvm_activate.failed | default(false))
+      register: fvm_install
+      ignore_errors: true
 
     - name: Set Flutter stable as fvm global default
       become_user: "{{ target_user }}"
@@ -682,6 +731,14 @@
         creates: "{{ user_home }}/fvm/default"
       environment:
         PATH: "{{ user_home }}/.pub-cache/bin:/usr/lib/dart/bin:/usr/bin:/bin"
+      when: not (fvm_install.failed | default(false))
+      register: fvm_global
+      ignore_errors: true
+
+    - name: Warn if fvm install failed
+      ansible.builtin.debug:
+        msg: "WARNING: fvm/Flutter install failed — continuing. Re-run kit or `fvm install stable && fvm global stable` later."
+      when: (fvm_activate.failed | default(false)) or (fvm_install.failed | default(false)) or (fvm_global.failed | default(false))
 
     # Git global config. credential.helper=cache keeps HTTPS creds in memory
     # for 15 min — prefer over `store` so an accidental PAT paste during
