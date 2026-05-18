@@ -29,6 +29,30 @@ write_files:
           extra0:
             dhcp4-overrides:
               route-metric: 50
+  # Enable systemd-resolved mDNS so the libnss-mdns SOA-probe for `local.`
+  # gets an instant negative from resolved. Without this, resolved tries
+  # to forward `local.` to upstream DNS (multipass internal at 10.247.x.1)
+  # which silently drops, glibc waits 2x5s, and every `.local` lookup
+  # eats 10s before falling through to avahi.
+  # `resolve` mode = resolution only; avahi-daemon stays in charge of
+  # publishing the VM's hostname.
+  - path: /etc/systemd/resolved.conf.d/10-mdns-resolve.conf
+    permissions: '0644'
+    content: |
+      [Resolve]
+      MulticastDNS=resolve
+  - path: /etc/systemd/network/10-netplan-default.network.d/mdns.conf
+    permissions: '0644'
+    content: |
+      [Network]
+      MulticastDNS=resolve
+  - path: /etc/systemd/network/10-netplan-extra0.network.d/mdns.conf
+    permissions: '0644'
+    content: |
+      [Network]
+      MulticastDNS=resolve
 
 runcmd:
   - netplan apply
+  - systemctl restart systemd-networkd
+  - systemctl restart systemd-resolved
