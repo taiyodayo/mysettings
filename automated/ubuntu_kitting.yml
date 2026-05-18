@@ -155,7 +155,7 @@
 
     - name: Add mise apt repo
       ansible.builtin.apt_repository:
-        repo: "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch={{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}] https://mise.jdx.dev/deb stable main"
+        repo: "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch={{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'amd64' }}] https://mise.jdx.dev/deb stable main"
         filename: mise
         state: present
 
@@ -178,7 +178,7 @@
 
     - name: Add gh apt repo
       ansible.builtin.apt_repository:
-        repo: "deb [arch={{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }} signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main"
+        repo: "deb [arch={{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'amd64' }} signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main"
         filename: github-cli
         state: present
 
@@ -212,7 +212,7 @@
 
     - name: Add Dart apt repo
       ansible.builtin.apt_repository:
-        repo: "deb [signed-by=/etc/apt/keyrings/dart.gpg arch={{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}] https://storage.googleapis.com/download.dartlang.org/linux/debian stable main"
+        repo: "deb [signed-by=/etc/apt/keyrings/dart.gpg arch={{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'amd64' }}] https://storage.googleapis.com/download.dartlang.org/linux/debian stable main"
         filename: dart_stable
         state: present
 
@@ -295,9 +295,9 @@
     - name: Add Docker apt repo
       ansible.builtin.apt_repository:
         repo: >-
-          deb [arch={{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}
+          deb [arch={{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'amd64' }}
           signed-by=/etc/apt/keyrings/docker.asc]
-          https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+          https://download.docker.com/linux/ubuntu {{ ansible_facts['distribution_release'] }} stable
         filename: docker
         state: present
       when: do_docker_migration
@@ -371,8 +371,8 @@
     - name: Skip R install on non-LTS
       ansible.builtin.debug:
         msg: >-
-          Skipping r2u-based R install — {{ ansible_distribution }}
-          {{ ansible_distribution_version }} is not LTS. r2u supports LTS only.
+          Skipping r2u-based R install — {{ ansible_facts['distribution'] }}
+          {{ ansible_facts['distribution_version'] }} is not LTS. r2u supports LTS only.
       when: not is_lts
 
     - name: Install R via r2u
@@ -387,7 +387,7 @@
 
         - name: Add r2u apt repo (r-cran-* binary debs)
           ansible.builtin.apt_repository:
-            repo: "deb [arch=amd64] https://r2u.stat.illinois.edu/ubuntu {{ ansible_distribution_release }} main"
+            repo: "deb [arch=amd64] https://r2u.stat.illinois.edu/ubuntu {{ ansible_facts['distribution_release'] }} main"
             filename: cranapt
             state: present
             update_cache: false
@@ -404,7 +404,7 @@
 
         - name: Add Marutter CRAN apt repo (current r-base / r-base-core)
           ansible.builtin.apt_repository:
-            repo: "deb https://cloud.r-project.org/bin/linux/ubuntu {{ ansible_distribution_release }}-cran40/"
+            repo: "deb https://cloud.r-project.org/bin/linux/ubuntu {{ ansible_facts['distribution_release'] }}-cran40/"
             filename: cran_r
             state: present
             update_cache: true
@@ -552,7 +552,7 @@
     # evaluates on the controller in the invoker's context, ignoring become.
     target_user: "{{ lookup('env', 'SUDO_USER') | default(lookup('env', 'USER'), true) }}"
     user_home: "/home/{{ target_user }}"
-    git_user_name: "taiyo@{{ ansible_hostname }} default"
+    git_user_name: "taiyo@{{ ansible_facts['hostname'] }} default"
     git_user_email: "taiyodayo@gmail.com"
 
   tasks:
