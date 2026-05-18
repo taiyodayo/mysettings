@@ -7,7 +7,11 @@
   gather_facts: true
 
   vars:
-    target_user: "{{ ansible_user_id }}"
+    # Invoking user. This playbook doesn't `become: true` at play level so
+    # `ansible_user_id` would work too, but using lookup('env', …) is
+    # consistent with the kitting playbook (which DOES become root) and
+    # robust against future become additions.
+    target_user: "{{ lookup('env', 'SUDO_USER') | default(lookup('env', 'USER'), true) }}"
     user_home: "/home/{{ target_user }}"
     bun_tools:
       - { name: gemini, package: "@google/gemini-cli" }
