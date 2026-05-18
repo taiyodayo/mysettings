@@ -14,6 +14,7 @@ __SSH_AUTHORIZED_KEYS__
 packages:
   - git
   - zsh
+  - wireguard
 
 package_update: true
 package_upgrade: true
