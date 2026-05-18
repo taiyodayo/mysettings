@@ -9,7 +9,7 @@ users:
     groups: [sudo, docker]
     sudo: 'ALL=(ALL) NOPASSWD:ALL'
     ssh_authorized_keys:
-      - ssh-ed25519 AAAAC3Nz...your-pubkey-here taiyo@mac
+__SSH_AUTHORIZED_KEYS__
 
 packages:
   - git
