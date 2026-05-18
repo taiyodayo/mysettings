@@ -24,9 +24,9 @@ else
   fi
 
   while true; do
-    read -rsp "Password for taiyo: " taiyo_password
+    read -rsp "New password for taiyo inside the VM: " taiyo_password
     echo
-    read -rsp "Confirm password for taiyo: " taiyo_password_confirm
+    read -rsp "Confirm new VM password for taiyo: " taiyo_password_confirm
     echo
 
     if [[ -z "${taiyo_password}" ]]; then
