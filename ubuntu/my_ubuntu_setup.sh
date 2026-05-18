@@ -15,17 +15,6 @@ if [[ -z "${SUDO_USER:-}" ]]; then
 fi
 
 echo "--- mailab ubuntu server kitting script ---"
-echo "Press ENTER to continue or any other key to exit."
-# Read a single character
-read -r -n 1 -s key
-# Check the value of the key
-if [ "$key" = "" ]; then
-    echo "Continuing..."
-    # Put the rest of your script here
-else
-    echo "Exiting..."
-    exit 0
-fi
 
 # apt - 全体でよく使うパッケージ
 # pkg-config + libssl-dev are build deps for typical Rust crates
