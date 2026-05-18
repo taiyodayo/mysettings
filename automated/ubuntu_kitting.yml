@@ -109,6 +109,16 @@
       community.general.snap:
         name: yq
         state: present
+      # Tolerant: snapd may not be ready immediately after install on
+      # minimal images, or may be unavailable in containers (LXD/Docker).
+      # Other apt-managed tools are unaffected — let the playbook continue.
+      register: snap_yq
+      ignore_errors: true
+
+    - name: Warn if yq snap install failed
+      ansible.builtin.debug:
+        msg: "WARNING: yq snap install failed — continuing without yq. Install manually later: snap install yq"
+      when: snap_yq.failed | default(false)
 
     # Purge apt rustc/cargo BEFORE the per-user rustup install in the user
     # block — otherwise apt's rustc/cargo (under /usr/bin) can shadow
@@ -371,6 +381,16 @@
       args:
         executable: /bin/bash
       when: not netdata_check.stat.exists
+      # Tolerant: netdata is a nice-to-have monitor, not a hard kitting
+      # dep. Kickstart can fail on minimal images / containers / network
+      # blips; let the rest of the playbook complete.
+      register: netdata_install
+      ignore_errors: true
+
+    - name: Warn if netdata install failed
+      ansible.builtin.debug:
+        msg: "WARNING: netdata install failed — continuing without it. Re-run kit or `curl -fsSL https://get.netdata.cloud/kickstart.sh | bash` later."
+      when: netdata_install.failed | default(false)
 
     # ---- R via r2u (binary CRAN packages from Ubuntu apt) ----
     # r2u only ships repos for current Ubuntu LTS. The whole block is gated
@@ -657,6 +677,9 @@
     # cargo-installed CLIs not packaged in apt. `cargo install` is idempotent
     # (skips when the requested version is already installed; rebuilds only on
     # upgrade). --locked uses the crate's pinned Cargo.lock.
+    # Tolerant per-item: each cargo install is heavy (qsv ≈ 10 min, can OOM
+    # on small VMs, can fail on missing system libs). A single crate failing
+    # shouldn't block the others or the rest of the playbook.
     - name: Install cargo CLIs (git-trim, du-dust, jless, zellij, qsv)
       become_user: "{{ target_user }}"
       ansible.builtin.shell: |
@@ -665,6 +688,8 @@
       args:
         executable: /bin/bash
         creates: "{{ user_home }}/.cargo/bin/{{ item.binary }}"
+      register: cargo_installs
+      ignore_errors: true
       loop:
         - { crate: git-trim, binary: git-trim }
         - { crate: du-dust, binary: dust }
@@ -675,6 +700,9 @@
     # fvm — Flutter Version Manager. Dart SDK comes from Google's apt repo
     # (system block above). fvm lives at ~/.pub-cache/bin/fvm; dot_zshrc.tmpl
     # picks it up via `[[ -d "$HOME/.pub-cache/bin" ]] && export PATH=...`.
+    # Tolerant: fvm is only needed for Flutter work. `fvm install stable`
+    # downloads ~500MB and frequently hits network blips. The whole block
+    # is non-blocking — kit completes without Flutter on slow/flaky links.
     - name: Activate fvm via dart pub global
       become_user: "{{ target_user }}"
       ansible.builtin.command: dart pub global activate fvm
@@ -682,9 +710,9 @@
         creates: "{{ user_home }}/.pub-cache/bin/fvm"
       environment:
         PATH: "/usr/lib/dart/bin:{{ user_home }}/.pub-cache/bin:/usr/bin:/bin"
+      register: fvm_activate
+      ignore_errors: true
 
-    # `fvm install stable` downloads ~500MB of Flutter SDK — gate on creates:
-    # so re-kits are fast.
     - name: Install Flutter stable via fvm
       become_user: "{{ target_user }}"
       ansible.builtin.command: fvm install stable
@@ -692,6 +720,9 @@
         creates: "{{ user_home }}/fvm/versions/stable"
       environment:
         PATH: "{{ user_home }}/.pub-cache/bin:/usr/lib/dart/bin:/usr/bin:/bin"
+      when: not (fvm_activate.failed | default(false))
+      register: fvm_install
+      ignore_errors: true
 
     - name: Set Flutter stable as fvm global default
       become_user: "{{ target_user }}"
@@ -700,6 +731,14 @@
         creates: "{{ user_home }}/fvm/default"
       environment:
         PATH: "{{ user_home }}/.pub-cache/bin:/usr/lib/dart/bin:/usr/bin:/bin"
+      when: not (fvm_install.failed | default(false))
+      register: fvm_global
+      ignore_errors: true
+
+    - name: Warn if fvm install failed
+      ansible.builtin.debug:
+        msg: "WARNING: fvm/Flutter install failed — continuing. Re-run kit or `fvm install stable && fvm global stable` later."
+      when: (fvm_activate.failed | default(false)) or (fvm_install.failed | default(false)) or (fvm_global.failed | default(false))
 
     # Git global config. credential.helper=cache keeps HTTPS creds in memory
     # for 15 min — prefer over `store` so an accidental PAT paste during
