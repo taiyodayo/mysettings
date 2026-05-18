@@ -54,10 +54,9 @@ rendered="$(mktemp "${render_dir}/cloud-init.XXXXXX.yaml")"
 chmod 0644 "${rendered}"
 trap 'rm -f "${rendered}"' EXIT
 
-awk -v block="${keys_block}" -v br0_mac="${br0_mac}" -v password_block="${password_block}" '
+awk -v block="${keys_block}" -v password_block="${password_block}" '
   /^__SSH_AUTHORIZED_KEYS__$/ { print block; next }
   /^__TAIYO_PASSWORD__$/ { if (password_block != "") print password_block; next }
-  { gsub(/__BR0_MAC__/, br0_mac) }
   { print }
 ' "${script_dir}/bootstrap.yaml" > "${rendered}"
 

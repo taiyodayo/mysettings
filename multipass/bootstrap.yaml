@@ -26,10 +26,7 @@ write_files:
       network:
         version: 2
         ethernets:
-          ens4:
-            match:
-              macaddress: "__BR0_MAC__"
-            dhcp4: true
+          extra0:
             dhcp4-overrides:
               route-metric: 50
 
