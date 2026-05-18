@@ -1,8 +1,9 @@
 # brew shellenv for LOGIN shells, which read ~/.zprofile but NOT ~/.zshrc.
 # Mirrors the brew bootstrap loop in dot_zshrc.tmpl so non-interactive logins
-# (e.g. `ssh user@host cmd`) still get brew on PATH. The loop tries Apple
-# Silicon (/opt/homebrew), Intel Mac (/usr/local), and linuxbrew
-# (/home/linuxbrew) in order — picks whichever exists.
+# (e.g. `ssh user@host cmd`) still get brew on PATH. Apple Silicon
+# (/opt/homebrew) and Intel Mac (/usr/local) are canonical; /home/linuxbrew
+# is included only for transition compatibility (linuxbrew is deprecated on
+# Linux — see check_tools.sh for uninstall instructions).
 for brew_path in /opt/homebrew/bin/brew /usr/local/bin/brew /home/linuxbrew/.linuxbrew/bin/brew; do
     if [ -x "$brew_path" ]; then
         eval "$($brew_path shellenv)"

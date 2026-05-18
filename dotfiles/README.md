@@ -64,6 +64,15 @@ If `chezmoi add ~/.zshrc` captures a token an installer wrote, the token will be
 
 If you eventually need to commit a secret (an SSH config snippet, an API token), set up chezmoi's [age encryption](https://www.chezmoi.io/user-guide/encryption/age/) and use the `encrypted_` prefix on the source filename. Not configured today.
 
+## linuxbrew is deprecated on Linux
+
+Mac brew is unchanged and remains the canonical Mac package manager. **On Linux**, linuxbrew is deprecated: apt + curl-pipe-sh installers (`rustup`, `uv`, `bun`, claude-native, etc.) cover every tool we use. linuxbrew added a parallel package universe at `/home/linuxbrew/` that:
+
+- Duplicated apt-managed tools (`gh`, `mise`, `uv`) and shadowed them via PATH ordering
+- Added ~500 MB on disk and a slow upgrade cycle
+
+`my_ubuntu_setup.sh` no longer installs linuxbrew on Linux. Existing installs are NOT auto-removed; `cli_tools/check_tools.sh` detects them, enumerates installed packages, and prints the uninstall command. The brew bootstrap loop in `dot_zshrc.tmpl`/`dot_zprofile.tmpl` still tries `/home/linuxbrew/` for **transition compatibility** so existing installs keep working until you uninstall.
+
 ## Why a separate `dotfiles/` subdirectory?
 
 chezmoi's default source location is `~/.local/share/chezmoi/`. We override that via `~/.config/chezmoi/chezmoi.toml` (written by `migrate_to_chezmoi.sh`) so chezmoi reads from `~/mysettings/dotfiles/`. Result: one repo for everything (kitting scripts, ansible playbooks, certs, dotfile templates), one `git pull`, one PR queue.
