@@ -35,3 +35,8 @@ multipass launch 26.04 \
   --cpus $(( $(nproc) - 2 )) --memory 32G --disk 100G \
   --network "name=br0,mac=${br0_mac}" \
   --cloud-init "${rendered}"
+
+multipass exec "${name}" -- bash -lc \
+  'nohup sudo env DEBIAN_FRONTEND=noninteractive bash -lc "apt-get update && apt-get upgrade -y" >/tmp/apt-upgrade.log 2>&1 </dev/null &'
+
+echo "Started background apt upgrade in ${name}; log: /tmp/apt-upgrade.log"
