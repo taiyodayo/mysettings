@@ -148,6 +148,11 @@ if [[ -z "${MULTIPASS_SKIP_CLAUDE_MOUNT:-}" ]]; then
     # Resolve VM taiyo's UID/GID. cloud-init's `users:` runs early, but
     # `multipass launch` can return before the user actually exists on
     # very slow hosts. Retry briefly.
+    #
+    # The actual VM-side UID depends on the multipass image's default-user
+    # handling: depending on whether the image already has a UID-1000
+    # `ubuntu` user, our taiyo lands at either 1000 or 1001. Always query;
+    # never guess. A wrong UID map produces a silently-unreadable mount.
     vm_taiyo_uid=""
     vm_taiyo_gid=""
     for _ in 1 2 3 4 5; do
@@ -156,13 +161,28 @@ if [[ -z "${MULTIPASS_SKIP_CLAUDE_MOUNT:-}" ]]; then
       [[ -n "${vm_taiyo_uid}" && -n "${vm_taiyo_gid}" ]] && break
       sleep 2
     done
-    if [[ -z "${vm_taiyo_uid}" || -z "${vm_taiyo_gid}" ]]; then
-      vm_taiyo_uid=1001
-      vm_taiyo_gid=1001
-      echo "WARNING: could not detect VM taiyo UID/GID; falling back to 1001/1001." >&2
-    fi
 
-    if multipass mount "${HOME}/.claude" "${name}:/home/taiyo/host-claude" \
+    if [[ -z "${vm_taiyo_uid}" || -z "${vm_taiyo_gid}" ]]; then
+      # No safe default exists (1000 and 1001 are both real possibilities).
+      # Skipping the mount instead of guessing — a wrong --uid-map produces
+      # a mount where taiyo can't read the credentials, looking authed to
+      # the script but unauthed to claude. Operator can re-mount once the
+      # VM has finished provisioning the taiyo user.
+      cat >&2 <<EOF
+ERROR: could not detect VM taiyo UID/GID after 5 retries.
+Skipping the credentials mount — a wrong UID map would make
+~/.claude/.credentials.json silently unreadable inside the VM.
+
+Once 'multipass exec ${name} -- id -u taiyo' returns a number, re-run:
+
+  multipass mount ${HOME}/.claude ${name}:/home/taiyo/host-claude \\
+      --uid-map \$(id -u):\$(multipass exec ${name} -- id -u taiyo) \\
+      --gid-map \$(id -g):\$(multipass exec ${name} -- id -g taiyo)
+  multipass exec ${name} -- sudo -u taiyo -H \\
+      ln -sfn /home/taiyo/host-claude/.credentials.json \\
+              /home/taiyo/.claude/.credentials.json
+EOF
+    elif multipass mount "${HOME}/.claude" "${name}:/home/taiyo/host-claude" \
           --uid-map "$(id -u):${vm_taiyo_uid}" \
           --gid-map "$(id -g):${vm_taiyo_gid}"; then
       # Mount succeeded — now safe to create the symlink. Done in the
@@ -177,6 +197,36 @@ if [[ -z "${MULTIPASS_SKIP_CLAUDE_MOUNT:-}" ]]; then
     else
       echo "WARNING: multipass mount of ~/.claude failed; claude inside ${name} will need 'claude /login' on first run." >&2
     fi
+  fi
+
+  # One-shot copy of host's ~/.claude.json into the VM. Claude needs BOTH
+  # the OAuth token (mounted via ~/.claude/.credentials.json) AND the
+  # top-level ~/.claude.json (userID / accountUuid / project trust). The
+  # mount only covers ~/.claude/ — the .claude.json file lives in $HOME,
+  # outside the mount, so it has to be copied separately.
+  #
+  # This is intentionally a one-shot snapshot (not a live mount): the host
+  # file evolves with use (new project trust entries, etc.) but the VM
+  # gets the version from launch time. Settings drift between host and VM
+  # accumulates, which is fine — the goal is "open authed", not "stay
+  # in sync".
+  #
+  # Why pipe through stdin instead of `multipass transfer`: the snap-
+  # confined multipass daemon can't read user-owned 0600 files. Piping
+  # via stdin lets the user (who owns the file) do the read, and tee
+  # inside the VM does the write.
+  if [[ -f "${HOME}/.claude.json" ]]; then
+    if ! cat "${HOME}/.claude.json" | multipass exec "${name}" -- \
+          sudo -u taiyo bash -c '
+            cat > /home/taiyo/.claude.json &&
+            chmod 600 /home/taiyo/.claude.json
+          '; then
+      echo "WARNING: failed to copy ~/.claude.json to ${name}. claude may still prompt for /login despite having credentials." >&2
+    fi
+  else
+    echo "Note: ${HOME}/.claude.json does not exist on host — skipping identity copy." >&2
+    echo "  Run \`claude\` on the host first to bootstrap it, then re-copy with:" >&2
+    echo "    cat ~/.claude.json | multipass exec ${name} -- sudo -u taiyo bash -c 'cat > /home/taiyo/.claude.json && chmod 600 /home/taiyo/.claude.json'" >&2
   fi
 fi
 
