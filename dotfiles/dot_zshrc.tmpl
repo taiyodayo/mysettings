@@ -11,8 +11,12 @@ setopt no_beep              # うるさいビープ音を止める
 # ~/.local/bin holds the native Claude Code binary (uv, other user-installed tools)
 export PATH="$HOME/.local/bin:$PATH"
 
-# Initialize brew in current session (handles architecture automatically).
-# Bootstraps brew from whichever install location exists — Apple Silicon, Intel, or linuxbrew.
+# Initialize brew in current session. Apple Silicon (/opt/homebrew) and Intel
+# Mac (/usr/local) are the canonical paths — Mac brew is our chosen package
+# manager. /home/linuxbrew is included for TRANSITION COMPATIBILITY only:
+# linuxbrew is deprecated on Linux (apt + curl-pipe-sh cover everything) but
+# we don't auto-remove existing installs. Run `cli_tools/check_tools.sh` to
+# see the uninstall command if you still have linuxbrew on a Linux box.
 for brew_path in /opt/homebrew/bin/brew /usr/local/bin/brew /home/linuxbrew/.linuxbrew/bin/brew; do
     if [[ -x "$brew_path" ]]; then
         eval "$($brew_path shellenv)"

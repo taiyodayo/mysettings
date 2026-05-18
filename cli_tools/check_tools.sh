@@ -276,10 +276,7 @@ check_gh() {
             warn "gh: duplicate at /snap/bin/gh (snap-installed)"
             fix_print "sudo snap remove gh"
         fi
-        if [ -e "/home/linuxbrew/.linuxbrew/bin/gh" ]; then
-            warn "gh: duplicate at /home/linuxbrew/.linuxbrew/bin/gh (linuxbrew)"
-            fix_print "brew uninstall gh"
-        fi
+        # linuxbrew gh duplicate handled by the umbrella check_linuxbrew() below.
     fi
     if command -v gh >/dev/null 2>&1; then
         local r; r=$(command -v gh)
@@ -303,10 +300,7 @@ check_mise() {
     else
         canon="/usr/bin/mise"
     fi
-    if [ "$OS" != "Darwin" ] && [ -e "/home/linuxbrew/.linuxbrew/bin/mise" ]; then
-        warn "mise: duplicate at /home/linuxbrew/.linuxbrew/bin/mise (linuxbrew)"
-        fix_print "brew uninstall mise"
-    fi
+    # linuxbrew mise duplicate handled by the umbrella check_linuxbrew() below.
     local r; r=$(command -v mise)
     if [ "$r" = "$canon" ]; then
         ok "mise: $r"
@@ -327,10 +321,7 @@ check_uv() {
     else
         canon="$HOME/.local/bin/uv"
     fi
-    if [ "$OS" != "Darwin" ] && [ -e "/home/linuxbrew/.linuxbrew/bin/uv" ]; then
-        warn "uv: duplicate at /home/linuxbrew/.linuxbrew/bin/uv (linuxbrew shadows astral.sh installer)"
-        fix_print "brew uninstall uv  # we prefer the astral.sh installer for self-update"
-    fi
+    # linuxbrew uv duplicate handled by the umbrella check_linuxbrew() below.
     local r; r=$(command -v uv)
     if [ "$r" = "$canon" ]; then
         ok "uv: $r"
@@ -385,6 +376,35 @@ check_node() {
 # Group 2 — warn-only. Common alternative installs may be intentional.
 # ============================================================================
 
+# --- linuxbrew (Linux only — deprecated) ---
+# We've migrated off linuxbrew on Linux. Mac brew is canonical and not touched
+# by this check. On Linux, /home/linuxbrew/.linuxbrew/bin/brew should not exist
+# on newly kitted boxes; existing installs aren't auto-removed but should be.
+check_linuxbrew() {
+    [ "$OS" = "Darwin" ] && return  # Mac brew is canonical
+    local brewbin="/home/linuxbrew/.linuxbrew/bin/brew"
+    if [ ! -x "$brewbin" ]; then
+        skip "linuxbrew: not installed (good — deprecated on Linux)"
+        return
+    fi
+    warn "linuxbrew: /home/linuxbrew/.linuxbrew detected (deprecated on Linux)"
+    note "apt + curl-pipe-sh cover all our tools — linuxbrew is parallel state."
+    # Enumerate what's actually installed so the user can verify alternatives.
+    local installed
+    installed=$("$brewbin" list 2>/dev/null || true)
+    if [ -n "$installed" ]; then
+        local count
+        count=$(echo "$installed" | wc -l)
+        note "Currently installed via linuxbrew ($count package(s)):"
+        echo "$installed" | head -15 | sed 's/^/         /'
+        if [ "$count" -gt 15 ]; then
+            note "         ... and $((count - 15)) more (run \`brew list\` to see all)"
+        fi
+    fi
+    fix_print "/bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/uninstall.sh)\""
+    note "After uninstall, restart shells to drop /home/linuxbrew from PATH."
+}
+
 # --- ruby (Mac only) ---
 check_ruby() {
     [ "$OS" = "Darwin" ] || { skip "ruby: warn-check skipped (Linux box; not our scope)"; return; }
@@ -434,6 +454,7 @@ check_gh
 check_mise
 check_uv
 check_node
+check_linuxbrew
 check_ruby
 check_flutter
 

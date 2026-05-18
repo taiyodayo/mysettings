@@ -316,12 +316,30 @@ fi
 sudo -u "$SUDO_USER" zsh << 'EOF'
 echo "Running as $SUDO_USER"
 
-# Homebrew (ユーザランドでインストール - root では動かない。補助的に使用)
-NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-# Add brew to shell profile if not already there
-if ! grep -Fq 'linuxbrew' ~/.zprofile 2>/dev/null; then
-  echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.zprofile
+# Homebrew on Linux is DEPRECATED.
+#
+# Why: apt + curl-pipe-sh covers everything we need (gh, mise, bat, eza,
+# rustup, uv, claude-native, bun). linuxbrew creates a parallel package
+# universe at /home/linuxbrew/ that:
+#   - Duplicates things apt has (gh, mise, uv) and shadows our canonical
+#     installs via PATH ordering — caught by cli_tools/check_tools.sh
+#   - Pulls in its own libgcc/glibc shims that occasionally conflict
+#     with system tooling
+#   - Adds ~500 MB on disk + slow upgrade cycle vs apt's fast binary debs
+#
+# Mac brew is unchanged — it's the canonical Mac package manager.
+# Existing linuxbrew installs on this fleet are NOT auto-removed — kitting
+# detects them and prints the uninstall command. Run cli_tools/check_tools.sh
+# anytime to see the warning + recommended action.
+if [ -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
+    echo ""
+    echo "*** linuxbrew is deprecated ***"
+    echo "  /home/linuxbrew/.linuxbrew/bin/brew detected. We no longer install"
+    echo "  linuxbrew during kitting. To remove it (recommended):"
+    echo "    /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/uninstall.sh)\""
+    echo "  Existing installs still work (~/.zshrc still sources brew shellenv"
+    echo "  if found), but tools should migrate to apt / curl-pipe-sh."
+    echo ""
 fi
 
 # node / mise (apt で root セクションにてインストール済み)
