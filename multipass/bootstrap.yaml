@@ -1,0 +1,20 @@
+#cloud-config
+groups:
+  - docker                        # pre-create so users_groups stage can join it
+
+users:
+  - default
+  - name: taiyo
+    shell: /bin/bash
+    groups: [sudo, docker]
+    sudo: 'ALL=(ALL) NOPASSWD:ALL'
+    ssh_authorized_keys:
+__SSH_AUTHORIZED_KEYS__
+
+packages:
+  - git
+  - zsh
+
+package_update: true
+package_upgrade: true
+package_reboot_if_required: true
