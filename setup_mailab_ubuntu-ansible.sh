@@ -101,13 +101,22 @@ fi
 # Validates and caches the sudo password once. Background loop refreshes
 # the cache every 60s so kit (which can take 20–30 minutes during cargo
 # builds) doesn't hit a re-prompt mid-run. Trap kills the loop on exit.
+#
+# On NOPASSWD-sudo systems (CI runners, cloud images, automation hosts),
+# `sudo -v` insists on a real password even though no command we run needs
+# one — and worse, it requires a TTY, breaking non-interactive runs. If
+# `sudo -n true` already succeeds, skip the validate + keep-alive entirely.
 echo
-echo "sudo authentication (one prompt; cached for the rest of the run):"
-sudo -v
-( while true; do sudo -n true; sleep 60; kill -0 $$ 2>/dev/null || exit; done ) &
-SUDO_KEEPALIVE_PID=$!
-# shellcheck disable=SC2064
-trap "kill $SUDO_KEEPALIVE_PID 2>/dev/null || true" EXIT
+if sudo -n true 2>/dev/null; then
+    echo "sudo: passwordless (NOPASSWD) detected; skipping prompt + keep-alive."
+else
+    echo "sudo authentication (one prompt; cached for the rest of the run):"
+    sudo -v
+    ( while true; do sudo -n true; sleep 60; kill -0 $$ 2>/dev/null || exit; done ) &
+    SUDO_KEEPALIVE_PID=$!
+    # shellcheck disable=SC2064
+    trap "kill $SUDO_KEEPALIVE_PID 2>/dev/null || true" EXIT
+fi
 
 # ---------------------------------------------------------------------------
 # Step 1: bootstrap ansible (pipx + Galaxy collections + apt prereqs)
