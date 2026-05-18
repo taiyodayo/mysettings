@@ -33,6 +33,13 @@
       - build-essential
       - pkg-config
       - libssl-dev
+      # xcb dev headers — jless pulls in clipboard → x11-clipboard → xcb at
+      # compile time and fails to link on headless servers without these.
+      # Same headers cover any future cargo CLI that depends on rust clipboard.
+      - libxcb1-dev
+      - libxcb-render0-dev
+      - libxcb-shape0-dev
+      - libxcb-xfixes0-dev
       - gpg
       - software-properties-common
       - dirmngr
