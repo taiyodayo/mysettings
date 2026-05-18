@@ -79,6 +79,19 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubc
   > /etc/apt/sources.list.d/github-cli.list
 apt-get update && apt-get install -y gh
 
+# Dart SDK — Google's official apt repo. Needed for Flutter Version Manager
+# (FVM) via `dart pub global activate fvm` in the userland section below.
+# Replaces linuxbrew's dart-sdk + fvm on Linux.
+# 詳細: https://dart.dev/get-dart
+apt-get install -y apt-transport-https
+mkdir -p -m 755 /etc/apt/keyrings
+wget -qO- https://dl-ssl.google.com/linux/linux_signing_key.pub \
+    | gpg --batch --yes --dearmor -o /etc/apt/keyrings/dart.gpg
+chmod go+r /etc/apt/keyrings/dart.gpg
+echo "deb [signed-by=/etc/apt/keyrings/dart.gpg arch=$(dpkg --print-architecture)] https://storage.googleapis.com/download.dartlang.org/linux/debian stable main" \
+    > /etc/apt/sources.list.d/dart_stable.list
+apt-get update && apt-get install -y dart
+
 # タイムゾーンを東京に設定
 timedatectl set-timezone Asia/Tokyo
 
@@ -372,6 +385,21 @@ fi
 # requested version is already installed and rebuilds only on upgrade.
 # --locked uses the crate's pinned Cargo.lock for deterministic builds.
 cargo install --locked git-trim
+
+# fvm — Flutter Version Manager, installed via `dart pub global activate`.
+# Replaces linuxbrew fvm. Dart SDK comes from Google's apt repo (root section
+# above). fvm puts its binary at ~/.pub-cache/bin/fvm — dot_zshrc.tmpl picks
+# it up via `[[ -d "$HOME/.pub-cache/bin" ]] && export PATH=...`.
+if command -v dart >/dev/null 2>&1; then
+    export PATH="$HOME/.pub-cache/bin:$PATH"
+    dart pub global activate fvm
+    # Install Flutter stable + set as fvm's global default, but only if not
+    # already done — `fvm install stable` downloads ~500MB.
+    if [ ! -d "$HOME/fvm/versions/stable" ]; then
+        fvm install stable
+    fi
+    fvm global stable
+fi
 
 # git のデフォルト
 git config --global user.name "taiyo@$(hostname) default"
