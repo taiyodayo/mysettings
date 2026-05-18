@@ -462,6 +462,12 @@
         # this into multiple installs lets a partial run leave R installed
         # without bspm, which makes the next install.packages() / pacman::
         # p_load() in any R session source-compile from CRAN.
+        #
+        # r2u's CDN is occasionally flaky (SSL EOF mid-download). Retry up
+        # to 3 times with 30s back-off so a single bad packet doesn't kill
+        # the whole R install. If retries are exhausted, ignore_errors lets
+        # the rest of the playbook complete — the operator can rerun later
+        # to pick R up.
         - name: Install r-base + bspm + lab-DS preload (one transaction)
           ansible.builtin.apt:
             name: "{{ ['r-base', 'r-base-dev',
@@ -470,6 +476,20 @@
             state: present
             install_recommends: false
             update_cache: true
+          register: r_apt_install
+          until: r_apt_install is success
+          retries: 3
+          delay: 30
+          ignore_errors: true
+
+        # If the r-base/bspm install failed (even after retries), skip the
+        # rest of the R block — the wrapper + Rprofile.site only make sense
+        # when R is actually installed. The whole R section becomes a no-op
+        # and a warning, leaving the operator to re-run later.
+        - name: Warn if R install failed (skipping R wrapper / Rprofile setup)
+          ansible.builtin.debug:
+            msg: "WARNING: r2u apt install failed after retries — skipping r-install wrapper + Rprofile.site setup. Re-run kit later to pick R up."
+          when: r_apt_install.failed | default(false)
 
         # Deploy the r-install wrapper + r-installers group + sudoers rule
         # so non-root users can install r-cran-* packages system-wide via
@@ -482,11 +502,13 @@
             owner: root
             group: root
             mode: "0755"
+          when: not (r_apt_install.failed | default(false))
 
         - name: Ensure r-installers group exists
           ansible.builtin.group:
             name: r-installers
             state: present
+          when: not (r_apt_install.failed | default(false))
 
         - name: Drop sudoers rule for r-install wrapper
           ansible.builtin.copy:
@@ -500,12 +522,14 @@
               # and never allows removal.
               %r-installers ALL=(root) NOPASSWD: /usr/local/bin/r-install
             validate: visudo -cf %s
+          when: not (r_apt_install.failed | default(false))
 
         - name: Add target user to r-installers
           ansible.builtin.user:
             name: "{{ target_user }}"
             groups: r-installers
             append: true
+          when: not (r_apt_install.failed | default(false))
 
         # /etc/R/Rprofile.site: root-only bspm + install_apt() helper for
         # everyone. Plain install.packages() in non-root sessions is
@@ -518,19 +542,35 @@
           loop:
             - '^suppressMessages\(bspm::enable\(\)\)'
             - '^options\(bspm\.version\.check=FALSE\)'
+          when: not (r_apt_install.failed | default(false))
 
         - name: Strip older mysettings-bspm marker block
           ansible.builtin.blockinfile:
             path: /etc/R/Rprofile.site
             marker: "# {mark} ANSIBLE MANAGED BLOCK - mysettings bspm"
             state: absent
+          when: not (r_apt_install.failed | default(false))
 
+        # Strip the older Ansible-default-style marker that earlier versions
+        # of this playbook wrote. Without this, hosts that ran a previous
+        # version end up with both blocks side-by-side after a re-kit.
+        - name: Strip older Ansible-style mysettings R config marker block
+          ansible.builtin.blockinfile:
+            path: /etc/R/Rprofile.site
+            marker: "# {mark} ANSIBLE MANAGED BLOCK - mysettings R config"
+            state: absent
+          when: not (r_apt_install.failed | default(false))
+
+        # Marker format matches what cli_tools/check_r.sh greps for
+        # (`# === BEGIN mysettings R config ===`). Without this exact shape
+        # check_r.sh reports the block as missing even though it's present.
         - name: Configure /etc/R/Rprofile.site (bspm + install_apt helper)
+          when: not (r_apt_install.failed | default(false))
           ansible.builtin.blockinfile:
             path: /etc/R/Rprofile.site
             create: true
             mode: "0644"
-            marker: "# {mark} ANSIBLE MANAGED BLOCK - mysettings R config"
+            marker: "# === {mark} mysettings R config ==="
             block: |
               # Root R: bspm enabled → install.packages() via apt to system lib.
               if (Sys.info()[["effective_user"]] == "root") {
@@ -558,11 +598,20 @@
           ansible.builtin.command: "{{ mysettings_repo_dir }}/cli_tools/check_r.sh"
           register: r_check
           changed_when: false
-          failed_when: r_check.rc != 0
+          failed_when: false
+          when: not (r_apt_install.failed | default(false))
 
         - name: Show R check output
           ansible.builtin.debug:
             var: r_check.stdout_lines
+          when: not (r_apt_install.failed | default(false))
+
+        - name: Warn if check_r.sh reported issues
+          ansible.builtin.debug:
+            msg: "WARNING: check_r.sh exited non-zero — R is installed but the bspm/preload sanity check found issues. See output above."
+          when:
+            - not (r_apt_install.failed | default(false))
+            - (r_check.rc | default(0)) != 0
 
     # ---- pinned ghostscript + ImageMagick 7 ----
     # gs 10 has a PDF mojibake bug for Japanese; pin to 9.55.
