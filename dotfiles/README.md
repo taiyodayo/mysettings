@@ -4,14 +4,22 @@ This directory is the [chezmoi](https://chezmoi.io) source for files that land i
 
 ## Layout
 
-| Source file (here)             | Deployed as       | Notes |
-|--------------------------------|-------------------|-------|
-| `dot_zshrc.tmpl`               | `~/.zshrc`        | absorbs all 8 imperative kitting-script appends as runtime conditionals. Cross-platform Flutter/bun blocks plus Mac-only block for GNU coreutils, dart pub, Android SDK, p313 venv |
-| `dot_p10k.zsh`                 | `~/.p10k.zsh`     | verbatim copy of `_p10k.zsh` (no template needed) |
-| `modify_dot_gitconfig.tmpl`    | `~/.gitconfig`    | **surgical** — uses `git config -f` to set canonical keys only, preserves everything else (e.g. `gh auth setup-git`'s per-host credential helpers stay intact) |
-| `dot_zprofile.tmpl`            | `~/.zprofile`     | linuxbrew shellenv on Ubuntu, empty on Mac |
+| Source file (here)                                       | Deploys to / runs as                       | Notes |
+|----------------------------------------------------------|--------------------------------------------|-------|
+| `dot_zshrc.tmpl`                                         | `~/.zshrc`                                 | absorbs all 8 imperative kitting-script appends as runtime conditionals. Cross-platform Flutter/bun blocks plus Mac-only block for GNU coreutils, dart pub, Android SDK, p313 venv |
+| `dot_p10k.zsh`                                           | `~/.p10k.zsh`                              | verbatim copy of `_p10k.zsh` (no template needed) |
+| `modify_dot_gitconfig.tmpl`                              | `~/.gitconfig`                             | **surgical** — uses `git config -f` to set canonical keys only, preserves everything else (e.g. `gh auth setup-git`'s per-host credential helpers stay intact) |
+| `dot_zprofile.tmpl`                                      | `~/.zprofile`                              | brew shellenv on Mac (and tolerates existing linuxbrew on Linux during deprecation) |
+| `run_onchange_install-rustup-and-cargo-tools.sh`         | runs whenever its content changes          | installs/updates rustup (curl-pipe-sh), then `cargo install --locked git-trim`. Add more cargo CLIs here = next apply installs them |
+| `run_onchange_install-uv.sh`                             | runs whenever its content changes          | installs/updates uv via astral.sh installer. No-op when uv was installed via package manager |
 
-Filename convention: `dot_foo` → `~/.foo`; `.tmpl` suffix marks files that go through chezmoi's Go template engine; `modify_` prefix marks an executable script that gets the current target file on stdin and emits the new content on stdout — used here so we can do partial edits to `~/.gitconfig` instead of full-file replacement.
+Filename conventions:
+
+- `dot_foo` → `~/.foo`
+- `.tmpl` suffix → file goes through chezmoi's Go template engine (`{{ if eq .chezmoi.os "darwin" }}` etc.)
+- `modify_` prefix → executable that takes current target file on stdin, emits new content on stdout. Used for partial edits (so we can preserve user-added keys in `~/.gitconfig`).
+- `run_once_<name>` → executable that runs once per content hash. chezmoi tracks state and skips if hash unchanged on re-apply.
+- `run_onchange_<name>` → executable that re-runs whenever the file's content hash changes. Edit the script (e.g. add a cargo CLI) and next apply runs it.
 
 ## Daily workflow
 
