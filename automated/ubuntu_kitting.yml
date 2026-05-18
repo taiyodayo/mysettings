@@ -348,11 +348,29 @@
       when: mailab_ca.changed
 
     # ---- netdata ----
+    # netdata was removed from Ubuntu's universe repo in 24.04 (noble) and
+    # later — apt install can't find it. Use netdata's official kickstart.sh
+    # which sets up netdata's own apt repo and installs from there. Works on
+    # 22.04, 24.04, 26.04. Idempotent via stat check on the binary.
 
-    - name: Install netdata
-      ansible.builtin.apt:
-        name: netdata
-        state: present
+    - name: Check if netdata is already installed
+      ansible.builtin.stat:
+        path: /usr/sbin/netdata
+      register: netdata_check
+
+    - name: Install netdata via official kickstart
+      # --non-interactive: no prompts (CI / kitting-safe)
+      # --stable-channel: stable release (not nightly)
+      # --disable-telemetry: don't phone home anonymously
+      # --dont-wait: don't block waiting for the service to settle
+      # No --claim-* flags → no registration with netdata cloud
+      ansible.builtin.shell: |
+        set -o pipefail
+        curl -fsSL https://get.netdata.cloud/kickstart.sh \
+          | bash -s -- --non-interactive --stable-channel --disable-telemetry --dont-wait
+      args:
+        executable: /bin/bash
+      when: not netdata_check.stat.exists
 
     # ---- R via r2u (binary CRAN packages from Ubuntu apt) ----
     # r2u only ships repos for current Ubuntu LTS. The whole block is gated

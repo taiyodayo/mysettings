@@ -202,9 +202,14 @@ if ! cmp -s "$ca_src" "$ca_dest" 2>/dev/null; then
     systemctl restart docker
 fi
 
-# netdata
-# aptでいれるのが一番早い。war roomへのノード追加はライセンス移行により辞めたほうが良くなった。
-apt-get install -y netdata
+# netdata — apt netdata was removed from Ubuntu 24.04 (noble) universe.
+# Use netdata's own kickstart.sh which sets up their apt repo and installs
+# from there. Works on 22.04, 24.04, 26.04. Idempotent via binary check.
+# war roomへのノード追加はライセンス移行により辞めたほうが良くなった (no --claim-* flags).
+if [ ! -x /usr/sbin/netdata ]; then
+    curl -fsSL https://get.netdata.cloud/kickstart.sh \
+        | bash -s -- --non-interactive --stable-channel --disable-telemetry --dont-wait
+fi
 
 # R via r2u — binary CRAN packages from Ubuntu apt.
 # r2u only ships repos for current Ubuntu LTS (22.04 jammy / 24.04 noble).
