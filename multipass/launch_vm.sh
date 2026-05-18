@@ -15,15 +15,23 @@ while [[ -z "${name}" ]]; do
   read -rp "Instance name: " name
 done
 
-rendered="$(mktemp --suffix=.yaml)"
+mac_suffix="$(printf '%s' "${name}" | sha256sum | cut -c1-6)"
+br0_mac="52:54:00:${mac_suffix:0:2}:${mac_suffix:2:2}:${mac_suffix:4:2}"
+
+render_dir="${HOME}/snap/multipass/common/tmp"
+mkdir -p "${render_dir}"
+rendered="$(mktemp "${render_dir}/cloud-init.XXXXXX.yaml")"
+chmod 0644 "${rendered}"
 trap 'rm -f "${rendered}"' EXIT
 
-awk -v block="${keys_block}" '
+awk -v block="${keys_block}" -v br0_mac="${br0_mac}" '
   /^__SSH_AUTHORIZED_KEYS__$/ { print block; next }
+  { gsub(/__BR0_MAC__/, br0_mac) }
   { print }
 ' "${script_dir}/bootstrap.yaml" > "${rendered}"
 
 multipass launch 26.04 \
   --name "${name}" \
   --cpus $(( $(nproc) - 2 )) --memory 32G --disk 100G \
+  --network "name=br0,mac=${br0_mac}" \
   --cloud-init "${rendered}"
