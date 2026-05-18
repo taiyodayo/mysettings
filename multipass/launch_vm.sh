@@ -198,6 +198,36 @@ EOF
       echo "WARNING: multipass mount of ~/.claude failed; claude inside ${name} will need 'claude /login' on first run." >&2
     fi
   fi
+
+  # One-shot copy of host's ~/.claude.json into the VM. Claude needs BOTH
+  # the OAuth token (mounted via ~/.claude/.credentials.json) AND the
+  # top-level ~/.claude.json (userID / accountUuid / project trust). The
+  # mount only covers ~/.claude/ — the .claude.json file lives in $HOME,
+  # outside the mount, so it has to be copied separately.
+  #
+  # This is intentionally a one-shot snapshot (not a live mount): the host
+  # file evolves with use (new project trust entries, etc.) but the VM
+  # gets the version from launch time. Settings drift between host and VM
+  # accumulates, which is fine — the goal is "open authed", not "stay
+  # in sync".
+  #
+  # Why pipe through stdin instead of `multipass transfer`: the snap-
+  # confined multipass daemon can't read user-owned 0600 files. Piping
+  # via stdin lets the user (who owns the file) do the read, and tee
+  # inside the VM does the write.
+  if [[ -f "${HOME}/.claude.json" ]]; then
+    if ! cat "${HOME}/.claude.json" | multipass exec "${name}" -- \
+          sudo -u taiyo bash -c '
+            cat > /home/taiyo/.claude.json &&
+            chmod 600 /home/taiyo/.claude.json
+          '; then
+      echo "WARNING: failed to copy ~/.claude.json to ${name}. claude may still prompt for /login despite having credentials." >&2
+    fi
+  else
+    echo "Note: ${HOME}/.claude.json does not exist on host — skipping identity copy." >&2
+    echo "  Run \`claude\` on the host first to bootstrap it, then re-copy with:" >&2
+    echo "    cat ~/.claude.json | multipass exec ${name} -- sudo -u taiyo bash -c 'cat > /home/taiyo/.claude.json && chmod 600 /home/taiyo/.claude.json'" >&2
+  fi
 fi
 
 multipass exec "${name}" -- bash -lc \
