@@ -8,6 +8,7 @@ users:
     shell: /bin/bash
     groups: [sudo, docker]
     sudo: 'ALL=(ALL) NOPASSWD:ALL'
+__TAIYO_PASSWORD__
     ssh_authorized_keys:
 __SSH_AUTHORIZED_KEYS__
 
