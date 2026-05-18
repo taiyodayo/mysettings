@@ -116,26 +116,67 @@ multipass launch 26.04 \
   --network "name=${bridge},mac=${bridge_mac}" \
   --cloud-init "${rendered}"
 
-# Mount host's ~/.claude into the VM so claude opens already-authorised on
-# first run inside the VM. cloud-init pre-creates a symlink at
-# ~/.claude/.credentials.json → /home/taiyo/host-claude/.credentials.json
-# (dangling until this mount lands).
+# Mount host's ~/.claude into the VM so claude opens already-authorised
+# on first run. cloud-init has installed the binary and created
+# /home/taiyo/.claude; here we:
+#   1. mount host's ~/.claude → VM /home/taiyo/host-claude/
+#   2. symlink VM ~/.claude/.credentials.json → /home/taiyo/host-claude/.credentials.json
+# Step 2 runs ONLY if step 1 succeeds — otherwise we'd leave a dangling
+# symlink that breaks `claude /login` (writes via the symlink target
+# fail ENOENT).
 #
-# Default UID/GID mapping (1000:1000 ↔ 1000:1000) is correct since both
-# the host and the VM run as user 'taiyo' at UID 1000. The mount persists
-# across `multipass stop/start` and survives reboots; remove with
+# UID/GID mapping: multipass's default is 1000:1000 on both sides, but
+# the VM's taiyo is the SECOND user added by cloud-init (multipass's
+# `default` user `ubuntu` claims UID 1000), so taiyo lands at UID 1001
+# inside the VM. We query the VM-side UID/GID dynamically with a short
+# retry — cloud-init may still be creating users when `multipass launch`
+# returns — and fall back to 1001 if discovery fails.
+#
+# Mount persists across `multipass stop/start` and reboots. Remove with
 # `multipass unmount ${name}:/home/taiyo/host-claude` if desired.
 #
-# Skippable: export MULTIPASS_SKIP_CLAUDE_MOUNT=1 to opt out (e.g. VM is
-# for a different identity, or the host has no Claude credentials yet).
+# Skip the whole thing: export MULTIPASS_SKIP_CLAUDE_MOUNT=1 (e.g. VM
+# should authenticate independently, or you're testing the unauth flow).
 if [[ -z "${MULTIPASS_SKIP_CLAUDE_MOUNT:-}" ]]; then
-  if [[ -d "${HOME}/.claude" ]]; then
-    multipass mount "${HOME}/.claude" "${name}:/home/taiyo/host-claude" \
-      || echo "WARNING: multipass mount of ~/.claude failed; claude inside ${name} will need 'claude /login' on first run." >&2
-  else
+  if [[ ! -d "${HOME}/.claude" ]]; then
     echo "Note: ${HOME}/.claude does not exist on host — skipping credential mount." >&2
-    echo "  Run \`claude\` on the host first to log in, then re-mount with:" >&2
-    echo "    multipass mount ${HOME}/.claude ${name}:/home/taiyo/host-claude" >&2
+    echo "  VM claude will run unauthenticated; use \`claude /login\` on first run." >&2
+    echo "  After logging in on the host (\`claude\`), re-mount with:" >&2
+    echo "    multipass mount ${HOME}/.claude ${name}:/home/taiyo/host-claude --uid-map \$(id -u):1001 --gid-map \$(id -g):1001" >&2
+    echo "    multipass exec ${name} -- sudo -u taiyo -H ln -sfn /home/taiyo/host-claude/.credentials.json /home/taiyo/.claude/.credentials.json" >&2
+  else
+    # Resolve VM taiyo's UID/GID. cloud-init's `users:` runs early, but
+    # `multipass launch` can return before the user actually exists on
+    # very slow hosts. Retry briefly.
+    vm_taiyo_uid=""
+    vm_taiyo_gid=""
+    for _ in 1 2 3 4 5; do
+      vm_taiyo_uid="$(multipass exec "${name}" -- id -u taiyo 2>/dev/null || true)"
+      vm_taiyo_gid="$(multipass exec "${name}" -- id -g taiyo 2>/dev/null || true)"
+      [[ -n "${vm_taiyo_uid}" && -n "${vm_taiyo_gid}" ]] && break
+      sleep 2
+    done
+    if [[ -z "${vm_taiyo_uid}" || -z "${vm_taiyo_gid}" ]]; then
+      vm_taiyo_uid=1001
+      vm_taiyo_gid=1001
+      echo "WARNING: could not detect VM taiyo UID/GID; falling back to 1001/1001." >&2
+    fi
+
+    if multipass mount "${HOME}/.claude" "${name}:/home/taiyo/host-claude" \
+          --uid-map "$(id -u):${vm_taiyo_uid}" \
+          --gid-map "$(id -g):${vm_taiyo_gid}"; then
+      # Mount succeeded — now safe to create the symlink. Done in the
+      # VM (not at provisioning time) so the symlink only ever exists
+      # when its target is reachable.
+      if ! multipass exec "${name}" -- sudo -u taiyo -H \
+            ln -sfn /home/taiyo/host-claude/.credentials.json \
+                    /home/taiyo/.claude/.credentials.json; then
+        echo "WARNING: failed to link credentials inside ${name}. Run manually:" >&2
+        echo "  multipass exec ${name} -- sudo -u taiyo -H ln -sfn /home/taiyo/host-claude/.credentials.json /home/taiyo/.claude/.credentials.json" >&2
+      fi
+    else
+      echo "WARNING: multipass mount of ~/.claude failed; claude inside ${name} will need 'claude /login' on first run." >&2
+    fi
   fi
 fi
 
