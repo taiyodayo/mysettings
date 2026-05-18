@@ -14,18 +14,14 @@ fi
 echo "Use zsh as default shell:"
 chsh -s "$(which zsh)"
 
-# Backup .zshrc if it exists
+# Backup existing .zshrc (auto, no prompt — matches the .p10k.zsh block below).
+# An interactive y/n here was a hidden silent-failure point: any answer other
+# than "y" exit'd the script with code 1, killing the wrapper's Step 1 before
+# the apt installs ever ran. Always-backup is safer; restore is one `cp` away.
 if [ -f ~/.zshrc ]; then
     backup_file=~/.zshrc.bak.$(date +%Y%m%d_%H%M%S)
-    read -p "Existing .zshrc found. Continue and backup to $backup_file? (y/n) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        mv ~/.zshrc "$backup_file"
-        echo "Backed up existing .zshrc to $backup_file"
-    else
-        echo "Aborted"
-        exit 1
-    fi
+    mv ~/.zshrc "$backup_file"
+    echo "Backed up existing .zshrc to $backup_file"
 fi
 # Copy new .zshrc
 cp -f _zshrc ~/.zshrc
