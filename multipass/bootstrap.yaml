@@ -12,10 +12,25 @@ users:
 __SSH_AUTHORIZED_KEYS__
 
 packages:
+  - avahi-daemon
   - git
+  - tmux
   - zsh
   - wireguard
 
-package_update: true
-package_upgrade: true
-package_reboot_if_required: true
+write_files:
+  - path: /etc/netplan/55-br0-route-metric.yaml
+    permissions: '0644'
+    content: |
+      network:
+        version: 2
+        ethernets:
+          ens4:
+            match:
+              macaddress: "__BR0_MAC__"
+            dhcp4: true
+            dhcp4-overrides:
+              route-metric: 50
+
+runcmd:
+  - netplan apply
