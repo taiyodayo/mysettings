@@ -116,6 +116,29 @@ multipass launch 26.04 \
   --network "name=${bridge},mac=${bridge_mac}" \
   --cloud-init "${rendered}"
 
+# Mount host's ~/.claude into the VM so claude opens already-authorised on
+# first run inside the VM. cloud-init pre-creates a symlink at
+# ~/.claude/.credentials.json → /home/taiyo/host-claude/.credentials.json
+# (dangling until this mount lands).
+#
+# Default UID/GID mapping (1000:1000 ↔ 1000:1000) is correct since both
+# the host and the VM run as user 'taiyo' at UID 1000. The mount persists
+# across `multipass stop/start` and survives reboots; remove with
+# `multipass unmount ${name}:/home/taiyo/host-claude` if desired.
+#
+# Skippable: export MULTIPASS_SKIP_CLAUDE_MOUNT=1 to opt out (e.g. VM is
+# for a different identity, or the host has no Claude credentials yet).
+if [[ -z "${MULTIPASS_SKIP_CLAUDE_MOUNT:-}" ]]; then
+  if [[ -d "${HOME}/.claude" ]]; then
+    multipass mount "${HOME}/.claude" "${name}:/home/taiyo/host-claude" \
+      || echo "WARNING: multipass mount of ~/.claude failed; claude inside ${name} will need 'claude /login' on first run." >&2
+  else
+    echo "Note: ${HOME}/.claude does not exist on host — skipping credential mount." >&2
+    echo "  Run \`claude\` on the host first to log in, then re-mount with:" >&2
+    echo "    multipass mount ${HOME}/.claude ${name}:/home/taiyo/host-claude" >&2
+  fi
+fi
+
 multipass exec "${name}" -- bash -lc \
   'nohup sudo env DEBIAN_FRONTEND=noninteractive bash -lc "apt-get update && apt-get upgrade -y" >/tmp/apt-upgrade.log 2>&1 </dev/null &'
 
