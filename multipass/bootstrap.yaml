@@ -61,13 +61,10 @@ runcmd:
   # playbook) so the VM has working `claude` on first login — before the
   # operator has run any further setup.
   - sudo -u taiyo -H bash -lc 'curl -fsSL https://claude.ai/install.sh | bash' || true
-  # Prepare for the credentials mount that launch_vm.sh sets up after
-  # `multipass launch` completes. Symlinks ~/.claude/.credentials.json
-  # into the host-mounted directory so `claude` is already-authorised the
-  # first time it runs. The mount target /home/taiyo/host-claude/ won't
-  # exist yet at cloud-init time (the mount happens post-launch) — the
-  # symlink stays dangling until then, then resolves. claude only reads
-  # credentials on first use, so order doesn't matter as long as the
-  # mount lands before the user invokes `claude` interactively.
+  # Pre-create ~/.claude/ so launch_vm.sh's post-mount symlink step has
+  # a stable target dir. The symlink itself is NOT created here — it
+  # depends on whether the host actually has credentials to share, and
+  # launch_vm.sh is the place that knows. Pre-creating a broken symlink
+  # here would break `claude /login` on hosts with no credentials (write
+  # through dangling symlink → ENOENT).
   - sudo -u taiyo -H mkdir -p /home/taiyo/.claude
-  - sudo -u taiyo -H ln -sfn /home/taiyo/host-claude/.credentials.json /home/taiyo/.claude/.credentials.json
