@@ -2,8 +2,7 @@
 # ubuntu サーバを共通でセットアップします
 # Re-entrant: safe to run repeatedly. Each section guards against
 # duplicate state (apt-get install is idempotent, file edits are guarded
-# with grep, restart-docker only fires when the CA cert actually changed,
-# IMEI only runs when ImageMagick isn't already installed).
+# with grep, restart-docker only fires when the CA cert actually changed).
 if [[ $EUID -ne 0 ]]; then
    echo "This script must be run as root" >&2
    exit 1
@@ -19,15 +18,28 @@ echo "--- mailab ubuntu server kitting script ---"
 # apt - 全体でよく使うパッケージ
 # pkg-config + libssl-dev are build deps for typical Rust crates
 # (openssl-sys etc.); see rustup section in the userland block below.
-# bat / eza ship in apt; `cargo install`-only tools (git-trim) go via rustup.
+# bat / eza / ripgrep / fd-find / zoxide / git-delta / duf / btop / hyperfine /
+# tealdeer / sd / procs ship in apt on 24.04+; cargo-only tools (git-trim,
+# du-dust, jless, zellij, qsv) go via rustup in the userland block.
 apt-get install -y zsh avahi-daemon parallel wireguard-tools nkf iftop iotop rclone lm-sensors \
-  build-essential pkg-config libssl-dev bat eza
+  build-essential pkg-config libssl-dev \
+  bat eza ripgrep jq fd-find zoxide git-delta duf btop hyperfine tealdeer sd procs
 
-# Debian/Ubuntu ship bat as /usr/bin/batcat (rename dodges a long-dead
-# package-name conflict). Add a `bat` symlink so the upstream-documented
-# command name works. Idempotent: only created if missing.
+# Debian/Ubuntu ship bat as /usr/bin/batcat and fd as /usr/bin/fdfind (renames
+# dodge long-dead package-name conflicts). Add `bat` / `fd` symlinks so the
+# upstream-documented command names work. Idempotent: only created if missing.
 if [ ! -e /usr/local/bin/bat ]; then
     ln -s /usr/bin/batcat /usr/local/bin/bat
+fi
+if [ ! -e /usr/local/bin/fd ]; then
+    ln -s /usr/bin/fdfind /usr/local/bin/fd
+fi
+
+# yq (mikefarah/yq, Go-based YAML processor — not the python-yq that apt ships
+# as `yq`). snap is the upstream-recommended Linux distribution channel.
+# Idempotent: snap install is a no-op if already present.
+if ! command -v yq >/dev/null 2>&1; then
+    snap install yq
 fi
 
 # Remove any apt-managed Rust dev toolchain BEFORE the per-user rustup
@@ -300,17 +312,9 @@ else
 fi
 
 # misc/datatools でよく使うパッケージ
-# ghostscript9, imagemagick7 via imei
-# gs 10はPDF処理にバグがあって使用できない！！ (使うと日本語文字が散発的に化ける) gs9.55を指定してインストール
-apt-get install -y ghostscript=9.55.0~dfsg1-0ubuntu5.4 qpdf mupdf
-# gs9.55 を使用するため、ソースからIM7をビルド (slow source compile;
-# only run when ImageMagick 7 isn't already present so re-runs are fast)
-if ! command -v magick >/dev/null 2>&1; then
-    t=$(mktemp) && \
-      wget 'https://dist.1-2.dev/imei.sh' -qO "$t" && \
-      bash "$t" && \
-      rm "$t"
-fi
+# ghostscript9 — gs 10 has a PDF mojibake bug for Japanese; pin 9.55.
+# Ubuntu 26.04+ ships ImageMagick 7 in apt; no IMEI source build needed.
+apt-get install -y ghostscript=9.55.0~dfsg1-0ubuntu5.4 qpdf mupdf imagemagick
 
 
 ### ここからユーザランド ###
@@ -391,7 +395,17 @@ fi
 # cargo-installed CLIs. `cargo install` is idempotent: it skips when the
 # requested version is already installed and rebuilds only on upgrade.
 # --locked uses the crate's pinned Cargo.lock for deterministic builds.
+# These four aren't in Ubuntu apt (or aren't reliably new enough); the
+# rest (ripgrep, zoxide, git-delta, …) come from apt above.
+#   du-dust  → dust binary
+#   jless    → JSON pager
+#   zellij   → terminal multiplexer
+#   qsv      → CSV swiss-army knife (--features apply enables data-cleanup ops)
 cargo install --locked git-trim
+cargo install --locked du-dust
+cargo install --locked jless
+cargo install --locked zellij
+cargo install --locked qsv --features apply
 
 # fvm — Flutter Version Manager, installed via `dart pub global activate`.
 # Replaces linuxbrew fvm. Dart SDK comes from Google's apt repo (root section

@@ -28,9 +28,33 @@
       - rclone
       - lm-sensors
       - build-essential
+      - pkg-config
+      - libssl-dev
       - gpg
       - software-properties-common
       - dirmngr
+      # snapd is required by the `Install yq via snap` task below. Ubuntu
+      # Server full images ship it, but minimal images don't — pin it so the
+      # kit playbook is self-sufficient regardless of how ansible got here
+      # (i.e. works even when the user took the `make collections` shortcut
+      # instead of `make bootstrap`).
+      - snapd
+      # Modern CLI tooling — apt-installable on 24.04+.
+      # cargo-only equivalents (du-dust, jless, zellij, qsv) live in the
+      # userland block; yq (mikefarah/yq) goes via snap.
+      - bat
+      - eza
+      - ripgrep
+      - jq
+      - fd-find
+      - zoxide
+      - git-delta
+      - duf
+      - btop
+      - hyperfine
+      - tealdeer
+      - sd
+      - procs
     # R-DS preload. Lands in /usr/lib/R/site-library — every user sees
     # these the moment they type `R`. Personal extras go to ~/R/...
     # via install.packages() as usual (and via bspm if running as root
@@ -60,6 +84,39 @@
         state: present
         update_cache: true
         cache_valid_time: 3600
+
+    # Debian/Ubuntu rename bat → batcat and fd-find → fdfind to dodge long-dead
+    # package-name conflicts. Restore upstream-documented command names.
+    - name: Symlink /usr/local/bin/bat → /usr/bin/batcat
+      ansible.builtin.file:
+        src: /usr/bin/batcat
+        dest: /usr/local/bin/bat
+        state: link
+
+    - name: Symlink /usr/local/bin/fd → /usr/bin/fdfind
+      ansible.builtin.file:
+        src: /usr/bin/fdfind
+        dest: /usr/local/bin/fd
+        state: link
+
+    # yq (mikefarah/yq, Go-based YAML processor) — apt ships python-yq under
+    # the same name, which is a different tool. snap is upstream's distribution
+    # channel for the Go binary.
+    - name: Install yq via snap
+      community.general.snap:
+        name: yq
+        state: present
+
+    # Purge apt rustc/cargo BEFORE the per-user rustup install in the user
+    # block — otherwise apt's rustc/cargo (under /usr/bin) can shadow
+    # ~/.cargo/bin depending on rc ordering. Idempotent — succeeds even when
+    # the packages aren't installed. (Ubuntu 26.04+ ships uutils + sudo-rs
+    # as system binaries; those aren't dev toolchains and are left alone.)
+    - name: Purge apt rustc/cargo (rustup installs per-user toolchain later)
+      ansible.builtin.apt:
+        name: [rustc, cargo]
+        state: absent
+        purge: true
 
     - name: Set timezone to Asia/Tokyo
       community.general.timezone:
@@ -105,12 +162,154 @@
         state: present
         update_cache: true
 
-    # ---- docker ----
+    # ---- gh (GitHub CLI from cli.github.com) ----
+    # Ubuntu-shipped gh lags upstream; always prefer the official apt repo.
+    # Mirrors https://github.com/cli/cli/blob/trunk/docs/install_linux.md
 
-    - name: Install docker.io and compose plugin
-      ansible.builtin.apt:
-        name: [docker.io, docker-compose-plugin]
+    - name: Fetch gh apt signing key
+      ansible.builtin.get_url:
+        url: https://cli.github.com/packages/githubcli-archive-keyring.gpg
+        dest: /etc/apt/keyrings/githubcli-archive-keyring.gpg
+        mode: "0644"
+        force: false
+
+    - name: Add gh apt repo
+      ansible.builtin.apt_repository:
+        repo: "deb [arch={{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }} signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main"
+        filename: github-cli
         state: present
+
+    - name: Install gh
+      ansible.builtin.apt:
+        name: gh
+        state: present
+        update_cache: true
+
+    # ---- Dart SDK (Google apt repo) ----
+    # Needed for Flutter Version Manager (fvm) via `dart pub global activate`
+    # in the userland block. Replaces linuxbrew dart-sdk + fvm on Linux.
+    # 詳細: https://dart.dev/get-dart
+
+    - name: Install apt-transport-https (Dart repo prereq)
+      ansible.builtin.apt:
+        name: apt-transport-https
+        state: present
+
+    - name: Fetch Google linux signing key (for Dart)
+      ansible.builtin.get_url:
+        url: https://dl-ssl.google.com/linux/linux_signing_key.pub
+        dest: /etc/apt/keyrings/dart.asc
+        mode: "0644"
+        force: false
+
+    - name: Dearmor Dart key
+      ansible.builtin.command:
+        cmd: gpg --batch --yes --dearmor -o /etc/apt/keyrings/dart.gpg /etc/apt/keyrings/dart.asc
+        creates: /etc/apt/keyrings/dart.gpg
+
+    - name: Add Dart apt repo
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/dart.gpg arch={{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}] https://storage.googleapis.com/download.dartlang.org/linux/debian stable main"
+        filename: dart_stable
+        state: present
+
+    - name: Install dart
+      ansible.builtin.apt:
+        name: dart
+        state: present
+        update_cache: true
+
+    # ---- docker (docker-ce from Docker Inc, not docker.io) ----
+    # Ubuntu's docker.io lags several major versions by mid-LTS cycle.
+    # docker-ce is on a current release cadence and is what the lab wants.
+    # On hosts with docker.io already installed AND running containers,
+    # migration is gated on `force_docker_migration=true` so we don't
+    # silently bounce production containers on a re-kit. Storage in
+    # /var/lib/docker survives the engine swap; containers without
+    # --restart=always do NOT auto-restart after migration.
+
+    - name: Detect existing docker.io install
+      ansible.builtin.command: dpkg-query -W -f='${Status}' docker.io
+      register: docker_io_status
+      failed_when: false
+      changed_when: false
+
+    - name: Detect running containers (only if docker.io present)
+      ansible.builtin.shell: docker ps --format '{{ "{{" }}.Names{{ "}}" }}' 2>/dev/null || true
+      register: docker_running
+      changed_when: false
+      when: docker_io_status.stdout is search('install ok installed')
+
+    - name: Decide whether to migrate docker.io → docker-ce
+      ansible.builtin.set_fact:
+        do_docker_migration: >-
+          {{
+            (docker_io_status.stdout is not search('install ok installed'))
+            or ((docker_running.stdout | default('') | trim) == '')
+            or (force_docker_migration | default(false) | bool)
+          }}
+
+    - name: Warn when skipping migration (running containers present)
+      ansible.builtin.debug:
+        msg: |
+          *** docker-ce migration SKIPPED ***
+          docker.io is installed with running container(s):
+            {{ docker_running.stdout_lines | default([]) | join(', ') }}
+          Migration would purge docker.io → install docker-ce, briefly
+          stopping all containers (those without --restart=always will NOT
+          auto-restart). Re-run with -e force_docker_migration=true once
+          containers are quiesced or you accept the brief downtime.
+      when: not do_docker_migration
+
+    - name: Purge legacy Docker packages (docker.io + bundled siblings)
+      ansible.builtin.apt:
+        name:
+          - docker.io
+          - docker-doc
+          - docker-compose
+          - docker-compose-v2
+          - podman-docker
+          - containerd
+          - runc
+        state: absent
+        purge: true
+      when: do_docker_migration
+
+    - name: Install ca-certificates + curl (for Docker apt key fetch)
+      ansible.builtin.apt:
+        name: [ca-certificates, curl]
+        state: present
+      when: do_docker_migration
+
+    - name: Fetch Docker apt signing key
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: "0644"
+        force: false
+      when: do_docker_migration
+
+    - name: Add Docker apt repo
+      ansible.builtin.apt_repository:
+        repo: >-
+          deb [arch={{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}
+          signed-by=/etc/apt/keyrings/docker.asc]
+          https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+        filename: docker
+        state: present
+      when: do_docker_migration
+
+    - name: Install docker-ce + plugins
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+      when: do_docker_migration
 
     - name: Add target user to docker group
       ansible.builtin.user:
@@ -324,34 +523,19 @@
           ansible.builtin.debug:
             var: r_check.stdout_lines
 
-    # ---- pinned ghostscript + IMEI builds ImageMagick 7 against it ----
+    # ---- pinned ghostscript + ImageMagick 7 ----
+    # gs 10 has a PDF mojibake bug for Japanese; pin to 9.55.
+    # Ubuntu 26.04+ ships ImageMagick 7 in apt, so no IMEI source build needed.
 
-    - name: Install pinned ghostscript and PDF tools
+    - name: Install pinned ghostscript, PDF tools, and ImageMagick
       ansible.builtin.apt:
         name:
           - "ghostscript={{ ghostscript_pinned }}"
           - qpdf
           - mupdf
+          - imagemagick
         state: present
         allow_downgrade: true
-
-    - name: Detect existing ImageMagick 7
-      ansible.builtin.command: magick -version
-      register: imagemagick_check
-      changed_when: false
-      failed_when: false
-
-    - name: Run IMEI installer to build IM7 against pinned gs
-      when: imagemagick_check.rc != 0
-      block:
-        - ansible.builtin.get_url:
-            url: https://dist.1-2.dev/imei.sh
-            dest: /tmp/imei.sh
-            mode: "0755"
-        - ansible.builtin.command: /tmp/imei.sh
-        - ansible.builtin.file:
-            path: /tmp/imei.sh
-            state: absent
 
 
 - name: Ubuntu server kitting — user layer
@@ -366,20 +550,29 @@
     git_user_email: "taiyodayo@gmail.com"
 
   tasks:
-    - name: Install Homebrew (linuxbrew) for target user
-      become_user: "{{ target_user }}"
-      ansible.builtin.shell: |
-        NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-      args:
-        creates: /home/linuxbrew/.linuxbrew/bin/brew
+    # linuxbrew is DEPRECATED on Linux. apt + curl-pipe-sh covers everything
+    # (gh, mise, bat, eza, rustup, uv, claude-native, bun). Linuxbrew creates
+    # a parallel package universe at /home/linuxbrew/ that shadows our
+    # canonical installs via PATH ordering — caught by check_tools.sh. We
+    # detect existing installs and print the uninstall command; never auto-
+    # remove (the user may have local state they care about).
+    - name: Detect deprecated linuxbrew install
+      ansible.builtin.stat:
+        path: /home/linuxbrew/.linuxbrew/bin/brew
+      register: linuxbrew_stat
 
-    - name: Source linuxbrew shellenv from ~/.zprofile
-      become_user: "{{ target_user }}"
-      ansible.builtin.lineinfile:
-        path: "{{ user_home }}/.zprofile"
-        line: 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"'
-        create: true
-        mode: "0644"
+    - name: Warn about deprecated linuxbrew
+      ansible.builtin.debug:
+        msg: |
+          *** linuxbrew is deprecated ***
+          /home/linuxbrew/.linuxbrew/bin/brew detected. We no longer install
+          linuxbrew during kitting (apt + curl-pipe-sh covers our tools).
+          To remove (recommended):
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/uninstall.sh)"
+          Existing installs still work but tools should migrate to
+          apt / curl-pipe-sh. Run cli_tools/check_tools.sh anytime to see
+          the warning + recommended action.
+      when: linuxbrew_stat.stat.exists
 
     - name: Activate mise + add cli_tools / ~/.local/bin to PATH in ~/.zshrc
       become_user: "{{ target_user }}"
@@ -399,7 +592,7 @@
       register: mise_use
       changed_when: "'already' not in (mise_use.stderr | default(''))"
       environment:
-        PATH: "/home/linuxbrew/.linuxbrew/bin:{{ user_home }}/.local/bin:/usr/bin:/bin"
+        PATH: "{{ user_home }}/.local/bin:/usr/bin:/bin"
 
     - name: Install uv (astral.sh) for target user
       become_user: "{{ target_user }}"
@@ -407,12 +600,129 @@
       args:
         creates: "{{ user_home }}/.local/bin/uv"
 
-    - name: Configure global git identity
+    # bun — JavaScript runtime + package manager. cli_tools/llms_update.sh
+    # uses `bun add -g` for codex/gemini, so bun must be on PATH before that.
+    # Installer is idempotent (upgrades in place), but we gate on creates: for
+    # cleaner Ansible reporting.
+    - name: Install bun for target user
+      become_user: "{{ target_user }}"
+      ansible.builtin.shell: curl -fsSL https://bun.sh/install | bash
+      args:
+        creates: "{{ user_home }}/.bun/bin/bun"
+
+    # rustup — per-user Rust toolchain in ~/.cargo. apt rustc/cargo were purged
+    # in the system block above so they can't shadow ~/.cargo/bin.
+    - name: Install rustup for target user
+      become_user: "{{ target_user }}"
+      ansible.builtin.shell: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+          | sh -s -- -y --default-toolchain stable
+      args:
+        creates: "{{ user_home }}/.cargo/bin/rustup"
+
+    - name: Update rustup + stable toolchain
+      become_user: "{{ target_user }}"
+      ansible.builtin.shell: |
+        . "{{ user_home }}/.cargo/env"
+        rustup self update
+        rustup update stable
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    # cargo-installed CLIs not packaged in apt. `cargo install` is idempotent
+    # (skips when the requested version is already installed; rebuilds only on
+    # upgrade). --locked uses the crate's pinned Cargo.lock.
+    - name: Install cargo CLIs (git-trim, du-dust, jless, zellij, qsv)
+      become_user: "{{ target_user }}"
+      ansible.builtin.shell: |
+        . "{{ user_home }}/.cargo/env"
+        cargo install --locked {{ item.crate }}{{ ' --features ' ~ item.features if item.features is defined else '' }}
+      args:
+        executable: /bin/bash
+        creates: "{{ user_home }}/.cargo/bin/{{ item.binary }}"
+      loop:
+        - { crate: git-trim, binary: git-trim }
+        - { crate: du-dust, binary: dust }
+        - { crate: jless,   binary: jless }
+        - { crate: zellij,  binary: zellij }
+        - { crate: qsv,     binary: qsv, features: apply }
+
+    # fvm — Flutter Version Manager. Dart SDK comes from Google's apt repo
+    # (system block above). fvm lives at ~/.pub-cache/bin/fvm; dot_zshrc.tmpl
+    # picks it up via `[[ -d "$HOME/.pub-cache/bin" ]] && export PATH=...`.
+    - name: Activate fvm via dart pub global
+      become_user: "{{ target_user }}"
+      ansible.builtin.command: dart pub global activate fvm
+      args:
+        creates: "{{ user_home }}/.pub-cache/bin/fvm"
+      environment:
+        PATH: "/usr/lib/dart/bin:{{ user_home }}/.pub-cache/bin:/usr/bin:/bin"
+
+    # `fvm install stable` downloads ~500MB of Flutter SDK — gate on creates:
+    # so re-kits are fast.
+    - name: Install Flutter stable via fvm
+      become_user: "{{ target_user }}"
+      ansible.builtin.command: fvm install stable
+      args:
+        creates: "{{ user_home }}/fvm/versions/stable"
+      environment:
+        PATH: "{{ user_home }}/.pub-cache/bin:/usr/lib/dart/bin:/usr/bin:/bin"
+
+    - name: Set Flutter stable as fvm global default
+      become_user: "{{ target_user }}"
+      ansible.builtin.command: fvm global stable
+      args:
+        creates: "{{ user_home }}/fvm/default"
+      environment:
+        PATH: "{{ user_home }}/.pub-cache/bin:/usr/lib/dart/bin:/usr/bin:/bin"
+
+    # Git global config. credential.helper=cache keeps HTTPS creds in memory
+    # for 15 min — prefer over `store` so an accidental PAT paste during
+    # `git clone https://...` never hits disk. SSH-based auth is unaffected.
+    # alias.sync depends on git-trim (installed via cargo above).
+    - name: Configure global git settings
       become_user: "{{ target_user }}"
       community.general.git_config:
         name: "{{ item.name }}"
         value: "{{ item.value }}"
         scope: global
       loop:
-        - { name: user.name,  value: "{{ git_user_name }}" }
-        - { name: user.email, value: "{{ git_user_email }}" }
+        - { name: user.name,         value: "{{ git_user_name }}" }
+        - { name: user.email,        value: "{{ git_user_email }}" }
+        - { name: credential.helper, value: "cache" }
+        - { name: fetch.prune,       value: "true" }
+        - { name: fetch.pruneTags,   value: "true" }
+        - { name: pull.rebase,       value: "true" }
+        - { name: alias.sync,        value: "!git fetch --all --prune && git trim --no-confirm" }
+
+    # ---- post-kit health checks ----
+    # Run as target_user. Both scripts are read-only by default and report
+    # status only — never fail the playbook. Final stdout shows up in the
+    # play recap so the operator sees auth/tool-canonicalness right away.
+
+    - name: Run login_check.sh (gh / claude / codex / gemini auth status)
+      become_user: "{{ target_user }}"
+      ansible.builtin.command: "{{ user_home }}/mysettings/cli_tools/login_check.sh"
+      register: login_check
+      changed_when: false
+      failed_when: false
+      environment:
+        PATH: "{{ user_home }}/mysettings/cli_tools:{{ user_home }}/.local/bin:{{ user_home }}/.cargo/bin:{{ user_home }}/.bun/bin:{{ user_home }}/.local/share/mise/shims:/usr/local/bin:/usr/bin:/bin"
+
+    - name: Show login_check.sh output
+      ansible.builtin.debug:
+        var: login_check.stdout_lines
+
+    - name: Run check_tools.sh (canonical-install audit)
+      become_user: "{{ target_user }}"
+      ansible.builtin.command: "{{ user_home }}/mysettings/cli_tools/check_tools.sh"
+      register: check_tools
+      changed_when: false
+      failed_when: false
+      environment:
+        PATH: "{{ user_home }}/mysettings/cli_tools:{{ user_home }}/.local/bin:{{ user_home }}/.cargo/bin:{{ user_home }}/.bun/bin:{{ user_home }}/.local/share/mise/shims:/usr/local/bin:/usr/bin:/bin"
+
+    - name: Show check_tools.sh output
+      ansible.builtin.debug:
+        var: check_tools.stdout_lines

@@ -30,11 +30,32 @@ One self-contained playbook per original script. No roles, no nested
 
 ## One-time bootstrap
 
+From a fresh Ubuntu host with nothing pre-installed:
+
 ```bash
-sudo apt-get update && sudo apt-get install -y ansible
-cd automated
-make bootstrap     # installs ansible.posix + community.general
+cd ~/mysettings/automated
+make bootstrap     # installs pipx + ansible (per-user) + Galaxy collections
 ```
+
+The bootstrap script is re-entrant — safe to re-run after a partial setup, or
+to upgrade `ansible` to the latest pipx-distributed version. It:
+
+- apt-installs `python3-venv`, `pipx`, `snapd`, `git`, `curl`,
+  `ca-certificates`
+- purges any apt-installed `ansible` (Ubuntu ships 2.10.x — too old for
+  `community.general >= 8.0.0`)
+- pipx-installs current `ansible` per-user under `~/.local/pipx/venvs/ansible`
+- installs the Galaxy collections in `requirements.yml`
+
+If `ansible` is already on PATH from another source, you can skip the bootstrap
+and just install collections:
+
+```bash
+make collections
+```
+
+After bootstrap, open a fresh shell (pipx writes the PATH update to
+`~/.bashrc` / `~/.zshrc`) — then `make kit` is ready.
 
 ## Running locally
 
