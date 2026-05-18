@@ -18,10 +18,10 @@ automated/
 ├── README.md
 ├── ubuntu_kitting.yml       # ≡ ubuntu/my_ubuntu_setup.sh
 ├── ubuntu_motd.yml          # ≡ ubuntu/ubuntu_motd_clean.sh
-├── ubuntu_macbook_hw.yml    # ≡ ubuntu_on_macbook.sh
+├── ubuntu_macbook_hw.yml    # ≡ ubuntu/ubuntu_on_macbook.sh
 ├── ubuntu_gui_tools.yml     # ≡ ubuntu/setup_gui_tools.sh
 ├── ubuntu_superclean.yml    # ≡ ubuntu/superclean_ubuntuserver/*
-├── zsh_and_keys.yml         # ≡ setup_zsh_and_keys.sh (Linux)
+├── zsh_and_keys.yml         # ≡ common/setup_zsh_and_keys.sh (Linux)
 └── llms_update.yml          # ≡ cli_tools/llms_update.sh
 ```
 

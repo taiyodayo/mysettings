@@ -1,5 +1,5 @@
 ---
-# Replaces ubuntu_on_macbook.sh. Adds SPI modules to initramfs and
+# Replaces ubuntu/ubuntu_on_macbook.sh. Adds SPI modules to initramfs and
 # installs the patched MacBook12 audio driver. Reboot manually after
 # this completes so the new initramfs takes effect.
 
