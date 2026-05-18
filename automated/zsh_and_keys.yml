@@ -12,7 +12,13 @@
   gather_facts: true
 
   vars:
-    target_user: "{{ ansible_user_id }}"
+    # Invoking user, NOT the become user. `ansible_user_id` gets clobbered
+    # to "root" when gather_facts runs with become: true. lookup('env', …)
+    # evaluates on the controller in the invoker's context, ignoring become.
+    # SUDO_USER fallback covers `sudo ansible-playbook …` invocations;
+    # USER covers the normal local-controller case. Override on remote
+    # fleet runs with `-e target_user=<name>`.
+    target_user: "{{ lookup('env', 'SUDO_USER') | default(lookup('env', 'USER'), true) }}"
     user_home: "/home/{{ target_user }}"
     mysettings_repo_dir: "{{ playbook_dir | dirname }}"
     github_username: ""

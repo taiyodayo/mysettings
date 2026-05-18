@@ -20,7 +20,10 @@
   tags: [audit, preboot]
 
   vars:
-    target_user: "{{ ansible_user_id }}"
+    # Invoking user, NOT the become user. See ubuntu_kitting.yml for the
+    # full rationale (gather_facts under become: true clobbers ansible_user_id
+    # to "root").
+    target_user: "{{ lookup('env', 'SUDO_USER') | default(lookup('env', 'USER'), true) }}"
 
   tasks:
     - name: Determine running kernel

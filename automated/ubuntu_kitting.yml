@@ -15,7 +15,10 @@
   gather_facts: true
 
   vars:
-    target_user: "{{ ansible_user_id }}"
+    # Invoking user, NOT the become user. `ansible_user_id` gets clobbered
+    # to "root" when gather_facts runs with become: true. lookup('env', …)
+    # evaluates on the controller in the invoker's context, ignoring become.
+    target_user: "{{ lookup('env', 'SUDO_USER') | default(lookup('env', 'USER'), true) }}"
     mysettings_repo_dir: "{{ playbook_dir | dirname }}"
     base_packages:
       - zsh
@@ -544,7 +547,10 @@
   gather_facts: false
 
   vars:
-    target_user: "{{ ansible_user_id }}"
+    # Invoking user, NOT the become user. `ansible_user_id` gets clobbered
+    # to "root" when gather_facts runs with become: true. lookup('env', …)
+    # evaluates on the controller in the invoker's context, ignoring become.
+    target_user: "{{ lookup('env', 'SUDO_USER') | default(lookup('env', 'USER'), true) }}"
     user_home: "/home/{{ target_user }}"
     git_user_name: "taiyo@{{ ansible_hostname }} default"
     git_user_email: "taiyodayo@gmail.com"
