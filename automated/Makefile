@@ -1,15 +1,25 @@
 # Convenience wrapper around ansible-playbook. Pass extra flags with EXTRA,
 # e.g. `make kit EXTRA='--check --diff'` for a dry-run.
 
+# Ensure pipx-installed ansible is findable by recipes even when the user
+# hasn't restarted their shell after `make bootstrap`. pipx ensurepath writes
+# ~/.local/bin to ~/.bashrc / ~/.zshrc, but the user's CURRENT shell only
+# picks that up on next login. Prepending here means `make zsh` / `make kit`
+# work immediately after `make bootstrap` in the same session.
+export PATH := $(HOME)/.local/bin:$(PATH)
+
 EXTRA ?=
 PLAY  = ansible-playbook $(EXTRA)
 
-.PHONY: help bootstrap kit motd macbook-hw gui audit purge purge-real postboot zsh llms
+.PHONY: help bootstrap collections kit motd macbook-hw gui audit purge purge-real postboot zsh llms
 
 help:
 	@grep -E '^[a-zA-Z0-9_-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*##' '{printf "  %-15s %s\n", $$1, $$2}'
 
-bootstrap: ## Install required Ansible collections (one-time)
+bootstrap: ## Install ansible + Galaxy collections from scratch (re-entrant)
+	bash $(CURDIR)/bootstrap.sh
+
+collections: ## Install ONLY the Galaxy collections (assumes ansible already present)
 	ansible-galaxy collection install -r requirements.yml
 
 kit: ## Full Ubuntu server kitting
