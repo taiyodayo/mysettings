@@ -11,6 +11,41 @@ eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shell
 PACKAGES_DIR="$SCRIPT_DIR/packages"
 # Shared common/ scripts (mise, dart, bun, node, fvm, git_defaults).
 MYSETTINGS_DIR="$SCRIPT_DIR"
+
+# ---- Early MAS downloads (Xcode + WireGuard) -----------------------------
+# Xcode (497799835) is multi-GB and historically the longest single download
+# in this kit. Kick it off NOW, before the bulk brew install, so it streams
+# in parallel with the ~50 brew formulae + casks + fonts + rust/uv/Flutter
+# downstream. Parent script (setup_mailab_mac.sh) waits on $install_pid at
+# the end, so the kit doesn't actually finish before Xcode is on disk.
+#
+# WireGuard (1451685025, Mac App Store, by Jason A. Donenfeld) is also
+# kicked off here — small, but App Store is the preferred install channel
+# for VPN clients (sandboxed + entitlement-managed by Apple).
+#
+# Prereq: user must be signed into the Mac App Store. If not, we warn and
+# skip cleanly so the rest of the kit completes; the user can `mas install
+# 497799835 1451685025` later once they sign in.
+brew install mas
+if mas account >/dev/null 2>&1; then
+    echo "App Store: $(mas account) — starting background downloads (Xcode + WireGuard)"
+    nohup mas install 497799835  > /tmp/xcode-install.log     2>&1 &
+    export install_pid=$!
+    # WireGuard is small + not waited on (orphan completion is fine).
+    nohup mas install 1451685025 > /tmp/wireguard-install.log 2>&1 &
+else
+    echo "WARNING: not signed into the Mac App Store."
+    echo "  → Open the App Store app and sign in, then re-run setup_mailab_mac.sh,"
+    echo "    or install Xcode + WireGuard manually after this script completes:"
+    echo "      mas install 497799835 1451685025"
+    echo "  Continuing without background MAS downloads."
+    # Empty install_pid → parent's wait is a no-op (guarded in setup_mailab_mac.sh).
+    export install_pid=""
+fi
+
+# ---- Bulk brew install ---------------------------------------------------
+# mas is already on PATH from the early-MAS block; the awk-xargs route
+# re-asserts it (no-op) along with the other ~50 formulae + casks + fonts.
 awk '/^- / { print $2 }' "$PACKAGES_DIR/darwin_brew_system.yml" \
   | xargs brew install
 awk '/^- / { print $2 }' \
@@ -53,12 +88,9 @@ if [[ "$OSTYPE" == "darwin"* ]] && ! grep -Fq 'USE_GNU_UTILS' ~/.zshrc 2>/dev/nu
 	echo "Added GNU utils PATH to .zshrc"
 fi
 
-# mac App Store CLI (mas) requires user to be signed in
-echo "Installing Xcode from Appstore via mas. please login when prompted."
-# バックグラウンドで xcode インストールを開始。親側のスクリプトで、 wait $install_pid することでインストール完了を待てる
-nohup mas install 497799835 > /tmp/xcode-install.log 2>&1 &
-# この値で、親側スクリプトの最後に wait します
-export install_pid=$!
+# Xcode + WireGuard MAS downloads were kicked off at the top of this
+# script (early-MAS block) so they stream in parallel with brew + the
+# downstream tooling installs below. $install_pid is exported from there.
 
 # 2025 ruby/cocoapods はもう homebrew で入れるのが主流になった！
 brew install ruby cocoapods
