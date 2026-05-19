@@ -15,9 +15,11 @@ onto a single declarative base. Living document — update as phases land.
 3. **Fleet-converge, not single-shot kit.** Re-running the kit must be
    safe, fast, idempotent, and `--check`-able. Drift detection across the
    10 servers is a first-class concern.
-4. **Thin platform sections.** `linux/` and `darwin/` only contain what
+4. **Thin platform sections.** `ubuntu/` and `mac/` only contain what
    is genuinely OS-bound: package-manager invocations for system
    libraries, kernel/sysctl, docker, R-via-r2u, mas, dockutil, AppleScript.
+   (The dirs keep their current names — the consolidation work is in
+   shared `common/` + `packages/`, not in renaming.)
 
 ## 2. Non-goals
 
@@ -30,9 +32,9 @@ onto a single declarative base. Living document — update as phases land.
   whose transitive deps quietly pull `openssl` / `libuv` / `libxml2` /
   `hdf5` / `harfbuzz` into `/home/linuxbrew/Cellar/`, duplicating system
   libs and creating subtle breakage (the exact pain we already lived
-  through). The shared `packages/modern_cli.yml` gives us the
-  consolidation we actually want — one canonical tool list, two thin
-  per-OS installers — without putting that footgun back in the kitchen.
+  through). The shared `packages/` YAML lists give us the consolidation
+  we actually want — canonical tool lists per OS, two thin per-OS
+  installers — without putting that footgun back in the kitchen.
   If a specific tool ever needs a route apt+cargo can't cover, it goes
   via cargo (statically linked, lives in `~/.cargo/bin`, no system
   pollution). This decision is locked: changing it requires re-opening
@@ -63,7 +65,7 @@ For every tool, ask in this order:
    Chrome / Android Studio on Linux today).
 
 When 1–3 apply, the install logic lives in `common/`. When 4–5 apply, it
-lives in `linux/` or `darwin/`.
+lives in `ubuntu/` or `mac/`.
 
 6. **Host chases modern versions; version-sensitive work runs in Docker.**
    Like Homebrew, the host runs current upstream of each tool. apt LTS lag
@@ -114,11 +116,11 @@ Symbol legend:
 
 These exist in apt AND brew at currentish versions and don't add new
 features often. The package-manager IS the official installer for these.
-Keep platform-split but **drive from a single shared list** in
-`packages/modern_cli.yml` so the intent is unified and the implementation
-differs only in apt-name vs. brew-name. Fast-moving CLIs (bat, eza,
-ripgrep, fd, git-delta) moved up to §4.1 — they go via cargo so the host
-stays current with upstream feature releases (§3 principle 6).
+Keep platform-split but the names live in their respective per-OS lists
+(`packages/linux_base.yml` for apt, `packages/darwin_brew_system.yml` for
+brew) — the lists differ only in apt-name vs. brew-name. Fast-moving CLIs
+(bat, eza, ripgrep, fd, git-delta) moved up to §4.1 — they go via cargo
+so the host stays current with upstream feature releases (§3 principle 6).
 
 | Tool         | apt name (Ubuntu)         | brew name (Mac) | Notes |
 |--------------|---------------------------|-----------------|-------|
@@ -137,7 +139,7 @@ stays current with upstream feature releases (§3 principle 6).
 | iftop, htop  | iftop / —                 | iftop, htop     |       |
 | tmux, tree, wget, rclone | wget+rclone present, tmux+tree added | yes | small drift today, normalise |
 
-### 4.3 Linux-only (target: `linux/`)
+### 4.3 Linux-only (lives in `ubuntu/`)
 
 System pieces with no Mac analogue.
 
@@ -148,7 +150,7 @@ System pieces with no Mac analogue.
   apt-transport-https, ca-certificates, curl, wget.
 - **apt rustc/cargo purge** (preserves rustup's per-user toolchain). The
   old `/usr/local/bin/bat → /usr/bin/batcat` and `fd → fdfind` symlinks
-  are removed once bat/fd move to the cargo route (§4.1) — the cargo
+  are removed in Phase 4 once bat/fd move to the cargo route — the cargo
   binaries land in `~/.cargo/bin` with their canonical names.
 - **timezone Asia/Tokyo, vm.swappiness=10.**
 - **mise apt repo** → replaced by mise.run; only Linux build deps stay.
@@ -170,7 +172,7 @@ System pieces with no Mac analogue.
 - **MOTD strip, superclean, GUI tools (Chrome, Android Studio via PPA)** —
   separate playbooks already, leave as-is.
 
-### 4.4 macOS-only (target: `darwin/`)
+### 4.4 macOS-only (lives in `mac/`)
 
 System pieces with no Linux analogue.
 
@@ -212,6 +214,9 @@ works" on all 10+ servers.
 
 ## 5. Target repository layout
 
+Directory names stay as today (`ubuntu/`, `mac/`) — the consolidation
+shows up in shared `common/` + a new `packages/`, not in renames.
+
 ```
 mysettings/
 ├── ATTACKPLAN.md                    ← this file
@@ -231,38 +236,24 @@ mysettings/
 │   ├── git_defaults.sh              NEW — git config block
 │   └── post_kit_checks.sh           NEW — login_check.sh + check_tools.sh
 │
-├── linux/                           ← Linux-only (was ubuntu/)
-│   ├── kit_system.sh                base apt + symlinks + timezone + sysctl + purge apt rust
-│   ├── kit_apt_modern_cli.sh        bat/eza/ripgrep/… via apt + yq via snap
-│   ├── kit_gh.sh                    cli.github.com apt repo
-│   ├── kit_docker.sh                docker-ce + docker.io migration
-│   ├── kit_mailab_ca.sh             /usr/local/share/ca-certificates
-│   ├── kit_netdata.sh
-│   ├── kit_r_via_r2u.sh             r2u + bspm + r-install wrapper + Rprofile.site
-│   ├── kit_ghostscript_pin.sh
-│   ├── ubuntu_on_macbook.sh         (unchanged)
-│   └── gui_tools.sh                 Chrome, Android Studio PPA
+├── ubuntu/                          ← Linux-only (kept as-is)
+│   ├── my_ubuntu_setup.sh           (existing — reads packages/*.yml)
+│   ├── setup_gui_tools.sh           Chrome, Android Studio PPA
+│   └── ubuntu_on_macbook.sh         (unchanged)
 │
-├── darwin/                          ← Mac-only (was mac/)
-│   ├── kit_brew_bootstrap.sh        install Homebrew if absent
-│   ├── kit_brew_system.sh           system libs from brew_system.txt
-│   ├── kit_brew_modern_cli.sh       bat/eza/ripgrep/… via brew
-│   ├── kit_brew_gnu_utils.sh        coreutils/findutils/grep + zshrc PATH
-│   ├── kit_brew_ruby_cocoapods.sh
-│   ├── kit_brew_gh.sh
-│   ├── kit_brew_casks.sh            iterm, vscode, chrome, fonts, etc.
-│   ├── kit_xcode_via_mas.sh         mas + wait $install_pid + license
-│   ├── kit_r_tidyverse.sh           --cask r + pacman::p_load
-│   ├── kit_iterm_plist.sh
-│   ├── kit_dock_and_defaults.sh     dockutil + defaults write
-│   └── kit_open_apps.sh             Android Studio SDK Manager, browser, postinstall note
+├── mac/                             ← Mac-only (kept as-is)
+│   ├── setup_cli_tools.sh           (existing — reads packages/*.yml)
+│   ├── setup_gui_apps.sh            (existing)
+│   ├── brew_tidyverse.sh            (existing — reads packages/darwin_brew_r_build_deps.yml)
+│   └── resources/                   iTerm2 plist etc.
 │
-├── packages/                        ← single source of truth lists
-│   ├── modern_cli.yml               canonical list, apt+brew names
-│   ├── linux_base.yml               apt-only system pkgs
-│   ├── darwin_brew_system.yml       brew-only system libs
+├── packages/                        ← single source of truth lists (plain YAML arrays)
+│   ├── README.md                    explains the layout
+│   ├── linux_base.yml               apt: base system + modern CLI for Ubuntu
+│   ├── darwin_brew_system.yml       brew formulae (system libs + modern CLI)
 │   ├── darwin_brew_casks.yml        GUI casks
-│   ├── darwin_brew_fonts.yml
+│   ├── darwin_brew_fonts.yml        font casks
+│   ├── darwin_brew_r_build_deps.yml brew formulae required to build R+tidyverse
 │   └── lab_python.yml               polars, pandas, numpy, ... for uv pip
 │
 ├── automated/                       ← Ansible — fleet convergence
@@ -272,9 +263,9 @@ mysettings/
 │   │   ├── all.yml
 │   │   ├── linux.yml
 │   │   └── darwin.yml
-│   ├── kitting.yml                  os-dispatch: imports linux.yml or darwin.yml
-│   ├── linux.yml                    imports tasks/linux_* + tasks/common_*
-│   ├── darwin.yml                   imports tasks/darwin_* + tasks/common_*
+│   ├── kitting.yml                  os-dispatch: imports ubuntu_kitting.yml or mac_kitting.yml
+│   ├── ubuntu_kitting.yml           (existing — vars_files from packages/*.yml)
+│   ├── mac_kitting.yml              NEW
 │   └── tasks/
 │       ├── common_mise.yml          ↔ common/install_mise.sh
 │       ├── common_uv.yml
@@ -283,9 +274,7 @@ mysettings/
 │       ├── common_node_dart.yml
 │       ├── common_fvm.yml
 │       ├── common_llms.yml
-│       ├── common_git.yml
-│       ├── linux_*.yml              ↔ linux/kit_*.sh
-│       └── darwin_*.yml             ↔ darwin/kit_*.sh
+│       └── common_git.yml
 │
 ├── cli_tools/                       ← unchanged
 ├── dotfiles/                        ← chezmoi, extended
@@ -303,7 +292,7 @@ bash form is preserved only as a documentation surface / fallback.
 
 ## 6. Migration phases
 
-Each phase is independently shippable. Both kit paths
+Each phase is independently shippable as one PR. Both kit paths
 (`setup_mailab_mac.sh`, `setup_mailab_ubuntu.sh`,
 `setup_mailab_ubuntu-ansible.sh`) must keep working after every phase.
 
@@ -336,16 +325,28 @@ otherwise have to migrate:
   carries the locked rationale.
 
 ### Phase 2 — Extract canonical package lists into `packages/`
-- Move `mac/brew_list.txt` → `packages/darwin_brew_system.yml` (YAML so
-  Ansible + bash both consume it) + `packages/modern_cli.yml` for the
-  overlap with apt.
-- Move `mac/brew_cask.txt` → `packages/darwin_brew_casks.yml` +
-  `packages/darwin_brew_fonts.yml`.
-- Move apt `base_packages` from `automated/ubuntu_kitting.yml` and the
-  inline list in `ubuntu/my_ubuntu_setup.sh` → `packages/linux_base.yml`
-  + the same `modern_cli.yml`.
-- Update the existing scripts/playbooks to read from `packages/*.yml`
-  (bash via `yq`, Ansible via `vars_files:`). **No behaviour change.**
+Plain YAML arrays so the lists are diffable, greppable, and edit-only.
+No metadata format — apt-vs-brew name differences just live in their
+respective per-OS file.
+
+- `mac/brew_list.txt` → `packages/darwin_brew_system.yml` (one entry per
+  formula; modern CLI tools stay listed here for now — Phase 4 moves
+  the fast-movers to cargo).
+- `mac/brew_cask.txt` → split into `packages/darwin_brew_casks.yml` +
+  `packages/darwin_brew_fonts.yml` (the `font-*` entries are casks but
+  named differently and updated less often).
+- The inline `brew install …` list at the top of `mac/brew_tidyverse.sh`
+  → `packages/darwin_brew_r_build_deps.yml`.
+- The inline `uv pip install …` list at the bottom of
+  `mac/setup_cli_tools.sh` → `packages/lab_python.yml` (sets up the
+  rails Phase 5 will run on; no Linux behaviour change in this phase).
+- Apt `base_packages` from `automated/ubuntu_kitting.yml` and the inline
+  `apt-get install` block at the top of `ubuntu/my_ubuntu_setup.sh` →
+  `packages/linux_base.yml`.
+- Bash consumers read with `awk '/^- / { print $2 }'` (no yq dep — that
+  would be a bootstrap chicken-and-egg). Ansible consumers use
+  `lookup('file', playbook_dir + '/../packages/<list>.yml') | from_yaml`.
+- **No behaviour change** — same package set installed before and after.
 - **Exit criteria:** Re-kit one Mac + one Ubuntu host, diff against
   pre-Phase-2 state — identical packages installed.
 
@@ -376,11 +377,13 @@ leave apt+brew and converge on `~/.cargo/bin`.
   §3.6). Fall back to `cargo install --locked` when no binstall release
   exists.
 - Remove these nine tools from `packages/darwin_brew_system.yml` and
-  from `packages/modern_cli.yml`'s Linux apt list.
+  from `packages/linux_base.yml`.
 - Remove the `/usr/local/bin/bat → /usr/bin/batcat` and
   `/usr/local/bin/fd → /usr/bin/fdfind` symlinks from
-  `linux/kit_system.sh` (the cargo binaries land in `~/.cargo/bin`
-  with the canonical name; no rename quirks to compensate for).
+  `ubuntu/my_ubuntu_setup.sh` + the equivalent tasks in
+  `automated/ubuntu_kitting.yml` (the cargo binaries land in
+  `~/.cargo/bin` with the canonical name; no rename quirks to
+  compensate for).
 - Teach `check_tools.sh` that `~/.cargo/bin` is canonical for all nine.
 - **Exit criteria:** Fresh Mac kit ends with these tools in
   `~/.cargo/bin` (not `/opt/homebrew/bin`); fresh Ubuntu kit has no apt
@@ -396,36 +399,22 @@ leave apt+brew and converge on `~/.cargo/bin`.
 - **Exit criteria:** `source ~/p313/bin/activate && python -c "import
   polars"` succeeds on a freshly kitted Ubuntu lab server.
 
-### Phase 6 — Reorganise to `linux/` and `darwin/`
-- Rename `ubuntu/` → `linux/`, split `my_ubuntu_setup.sh` into the
-  per-section scripts listed in §5 (kit_system, kit_apt_modern_cli,
-  kit_gh, kit_docker, kit_mailab_ca, kit_netdata, kit_r_via_r2u). Each
-  is sourced by `setup_mailab_ubuntu.sh`. Note: no
-  `kit_ghostscript_pin.sh` — that script no longer exists post-Phase-1.
-- Rename `mac/` → `darwin/`, split `setup_cli_tools.sh` +
-  `setup_gui_apps.sh` + `brew_tidyverse.sh` similarly.
-- Update internal refs (`./common/`, `./ubuntu/`, `./mac/` →
-  `./linux/`, `./darwin/`).
-- Leave `setup_mailab_ubuntu-ansible.sh` and `automated/` running off
-  the same `packages/` and `common/` scripts so both paths converge.
-- **Exit criteria:** `setup_mailab_mac.sh` and `setup_mailab_ubuntu.sh`
-  both produce identical end-state to pre-Phase-6 kits.
-
-### Phase 7 — Ansible cross-platform dispatch
+### Phase 6 — Ansible cross-platform dispatch
 - Extend `automated/bootstrap.sh` with macOS branch (`brew install pipx
   && pipx install ansible` or `brew install ansible` directly).
 - Add `automated/group_vars/{all,linux,darwin}.yml`.
-- Rename `automated/ubuntu_kitting.yml` → `automated/kitting.yml` and
-  split into `linux.yml` + `darwin.yml` playbooks that share the
-  `common_*.yml` task files.
-- `darwin.yml` plays: brew bootstrap, brew system pkgs, brew modern CLI,
-  GNU utils, ruby/cocoapods, brew gh, brew casks, iterm plist, dock
+- Add an `automated/kitting.yml` dispatcher that includes either
+  `ubuntu_kitting.yml` (existing) or a new `mac_kitting.yml` based on
+  the host's OS family, sharing the `common_*.yml` task files.
+- `mac_kitting.yml` plays: brew bootstrap, brew system pkgs (from
+  `packages/darwin_brew_system.yml`), GNU utils, ruby/cocoapods, brew gh,
+  brew casks (from `packages/darwin_brew_casks.yml`), iterm plist, dock
   defaults, R tidyverse. `mas`, Xcode wait, AppleScript bits remain in
   `setup_mailab_mac.sh` as a post-step — Ansible doesn't drive those.
 - **Exit criteria:** `ansible-playbook -i localhost, kitting.yml` on a
   fresh Mac kits the declarative half end-to-end.
 
-### Phase 8 — Roll out to lab fleet
+### Phase 7 — Roll out to lab fleet
 - Add the 10 lab server hostnames to `automated/inventory.yml` under a
   `lab_servers` group.
 - Verify SSH-key login works to all 10 from the controller (use the
@@ -441,9 +430,9 @@ leave apt+brew and converge on `~/.cargo/bin`.
 - **Exit criteria:** all 10 servers green on a clean `--check` run;
   `check_tools.sh` clean on each.
 
-### Phase 9 — Documentation + decommission
+### Phase 8 — Documentation + decommission
 - Update `README.md` to describe the new layout and the
-  `common/`/`linux/`/`darwin/`/`packages/`/`automated/` split.
+  `common/`/`ubuntu/`/`mac/`/`packages/`/`automated/` split.
 - Mark `setup_mailab_ubuntu-ansible.sh` as the canonical Ubuntu kit
   (the orchestrator now is just `ansible-playbook` under the hood);
   keep `setup_mailab_ubuntu.sh` working as the lighter no-Ansible
@@ -480,7 +469,7 @@ And the Ansible variant against localhost:
 cd automated && make bootstrap && make kit
 ```
 
-And, by Phase 8, the fleet:
+And, by Phase 7, the fleet:
 ```bash
 ansible-playbook -i inventory.yml --check --diff --limit lab_servers kitting.yml
 ```

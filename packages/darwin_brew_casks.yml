@@ -1,0 +1,37 @@
+# GUI applications installed via `brew install --cask`.
+# Fonts are casks too but live separately in darwin_brew_fonts.yml so
+# they can be churned independently.
+#
+# Read by:
+#   - mac/setup_cli_tools.sh  (bash → awk → xargs brew install --cask --force)
+
+# -- terminals, editors, IDEs --
+- iterm2
+- sublime-text
+- visual-studio-code
+- android-studio
+
+# -- networking / file transfer --
+- cyberduck
+- mountain-duck
+- vnc-viewer
+- wireshark
+
+# -- browsers + chat --
+- google-chrome
+- discord
+
+# -- compression + archive --
+- keka
+
+# -- system utilities --
+- onyx
+
+# -- VCS / git GUI --
+- github
+
+# -- data / statistics --
+- r
+
+# -- JDK (currently kitted; revisit per ATTACKPLAN if no Java work remains) --
+- temurin

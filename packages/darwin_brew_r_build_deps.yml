@@ -1,0 +1,16 @@
+# brew formulae required to build R + tidyverse + languageserver on Mac.
+# These pull in headers used during R's source compile of CRAN packages
+# (libgit2 for gert/usethis, openssl for httr2, libxml2 for xml2, etc.).
+#
+# Read by:
+#   - mac/brew_tidyverse.sh  (bash → awk → xargs brew install)
+
+- cmake
+- curl
+- fribidi
+- harfbuzz
+- libgit2
+- libsodium
+- libtiff
+- libxml2
+- openssl

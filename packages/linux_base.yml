@@ -1,0 +1,54 @@
+# apt packages for Ubuntu lab servers.
+#
+# Read by:
+#   - ubuntu/my_ubuntu_setup.sh           (bash → awk extraction)
+#   - automated/ubuntu_kitting.yml        (Ansible → lookup('file') | from_yaml)
+#
+# Editing this file is the canonical way to add/remove apt packages.
+# See packages/README.md for the consumer recipe.
+#
+# Modern CLI tools (bat, eza, ripgrep, fd-find, git-delta) stay here for
+# now; ATTACKPLAN Phase 4 moves them to ~/.cargo/bin so the host keeps up
+# with upstream feature releases.
+
+# -- base system --
+- zsh
+- avahi-daemon
+- parallel
+- wireguard-tools
+- nkf
+- iftop
+- iotop
+- rclone
+- lm-sensors
+- build-essential
+- pkg-config
+- libssl-dev
+
+# -- xcb dev headers: jless pulls in clipboard → x11-clipboard → xcb at
+#    cargo-build time and fails to link on headless servers without these.
+- libxcb1-dev
+- libxcb-render0-dev
+- libxcb-shape0-dev
+- libxcb-xfixes0-dev
+
+# -- apt-repo plumbing prereqs (gpg keys, snap, https transport) --
+- gpg
+- software-properties-common
+- dirmngr
+- snapd
+
+# -- modern CLI (apt names; some differ from brew, e.g. fd-find vs fd) --
+- bat
+- eza
+- ripgrep
+- jq
+- fd-find
+- zoxide
+- git-delta
+- duf
+- btop
+- hyperfine
+- tealdeer
+- sd
+- procs

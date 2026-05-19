@@ -23,15 +23,16 @@ echo "--- apt update + upgrade (chasing current upstream) ---"
 apt-get update
 apt-get upgrade -y
 
-# apt - 全体でよく使うパッケージ
-# pkg-config + libssl-dev are build deps for typical Rust crates
-# (openssl-sys etc.); see rustup section in the userland block below.
-# bat / eza / ripgrep / fd-find / zoxide / git-delta / duf / btop / hyperfine /
-# tealdeer / sd / procs ship in apt on 24.04+; cargo-only tools (git-trim,
-# du-dust, jless, zellij, qsv) go via rustup in the userland block.
-apt-get install -y zsh avahi-daemon parallel wireguard-tools nkf iftop iotop rclone lm-sensors \
-  build-essential pkg-config libssl-dev \
-  bat eza ripgrep jq fd-find zoxide git-delta duf btop hyperfine tealdeer sd procs
+# apt packages — canonical list lives in packages/linux_base.yml so the
+# Ansible playbook (automated/ubuntu_kitting.yml) reads the same set.
+# Add / remove there, not here.
+#
+# `awk '/^- / { print $2 }'` extracts the package name from each YAML
+# array entry. No yq dependency — yq itself is one of the things the kit
+# installs, so we can't depend on it during bootstrap.
+PACKAGES_DIR="$(dirname "$(readlink -f "$0")")/../packages"
+awk '/^- / { print $2 }' "$PACKAGES_DIR/linux_base.yml" \
+  | xargs -r apt-get install -y
 
 # Debian/Ubuntu ship bat as /usr/bin/batcat and fd as /usr/bin/fdfind (renames
 # dodge long-dead package-name conflicts). Add `bat` / `fd` symlinks so the

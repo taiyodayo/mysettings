@@ -4,13 +4,17 @@ set -euo pipefail
 # homebrew はこのスクリプトより前にインストールされている
 # Initialize brew in current session (handles architecture automatically)
 eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv)"
-# Install brew packages from lists
-if [ -f "$SCRIPT_DIR/mac/brew_list.txt" ]; then
-    cat "$SCRIPT_DIR/mac/brew_list.txt" | xargs brew install
-fi
-if [ -f "$SCRIPT_DIR/mac/brew_cask.txt" ]; then
-    cat "$SCRIPT_DIR/mac/brew_cask.txt" | xargs brew install --cask --force
-fi
+
+# Canonical package lists live in packages/*.yml (shared format with the
+# Ansible variant). awk extracts package names — no yq dep since yq is
+# one of the things we're installing.
+PACKAGES_DIR="$SCRIPT_DIR/packages"
+awk '/^- / { print $2 }' "$PACKAGES_DIR/darwin_brew_system.yml" \
+  | xargs brew install
+awk '/^- / { print $2 }' \
+    "$PACKAGES_DIR/darwin_brew_casks.yml" \
+    "$PACKAGES_DIR/darwin_brew_fonts.yml" \
+  | xargs brew install --cask --force
 
 # Add GNU utils to .zshrc (macOS only, idempotent)
 if [[ "$OSTYPE" == "darwin"* ]] && ! grep -Fq 'USE_GNU_UTILS' ~/.zshrc 2>/dev/null; then
@@ -125,7 +129,10 @@ if [ ! -f ~/.zshrc ] || ! grep -q "$HOME/p313" ~/.zshrc; then
 fi
 # shellcheck source=/dev/null
 source "$HOME/p313/bin/activate"
-uv pip install polars pandas numpy requests pyarrow scikit-learn jupyter
+# Lab DS preload — canonical list in packages/lab_python.yml (Phase 5
+# will lift this to common/ so the same set lands on Linux too).
+awk '/^- / { print $2 }' "$PACKAGES_DIR/lab_python.yml" \
+  | xargs uv pip install
 
 # Add custom CLI tools directory to PATH
 if [ ! -f ~/.zshrc ] || ! grep -Fq 'mysettings/cli_tools' ~/.zshrc; then

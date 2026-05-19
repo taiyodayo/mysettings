@@ -1,0 +1,94 @@
+# brew formulae for macOS lab + dev machines.
+#
+# Read by:
+#   - mac/setup_cli_tools.sh  (bash → awk extraction → xargs brew install)
+#
+# Editing this file is the canonical way to add/remove brew formulae.
+# Casks live in darwin_brew_casks.yml; fonts in darwin_brew_fonts.yml.
+# R/tidyverse build deps live in darwin_brew_r_build_deps.yml.
+#
+# Modern CLI tools (bat, eza, fd, rg, git-delta) stay here for now;
+# ATTACKPLAN Phase 4 moves them to ~/.cargo/bin so the host keeps up
+# with upstream feature releases.
+
+# -- networking + download tools --
+- aria2
+- mtr
+- rclone
+- telnet
+- wget
+
+# -- build / dev tooling --
+- automake
+- awscli
+- cocoapods
+- direnv
+- dockutil
+- gh
+- git
+- git-lfs
+- google-cloud-sdk
+- mas
+- ruby
+- shellcheck
+- subversion
+
+# -- runtime / language managers --
+- bun
+- mise
+- uv
+
+# -- GNU userland (Mac ships BSD; we want GNU on PATH) --
+- bash
+- coreutils
+- findutils
+- gnu-sed
+- gnu-tar
+- grep
+
+# -- system libs --
+- hdf5
+- libuv
+- little-cms2
+- oath-toolkit
+- pigz
+- zlib
+
+# -- PDF / imaging --
+- graphicsmagick
+- imagemagick
+- mupdf
+- poppler
+- qpdf
+
+# -- misc system utils --
+- htop
+- iftop
+- parallel
+- pstree
+- rename
+- tmux
+- tree
+- unar
+- watch
+- hexyl
+
+# -- modern CLI (brew names; some differ from apt, e.g. fd vs fd-find) --
+- bat
+- btop
+- duf
+- dust
+- eza
+- fd
+- git-delta
+- hyperfine
+- jless
+- jq
+- procs
+- qsv
+- rg
+- sd
+- tealdeer
+- yq
+- zellij
+- zoxide

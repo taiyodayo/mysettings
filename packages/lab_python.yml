@@ -1,0 +1,19 @@
+# Python packages preloaded into ~/p313 (uv-managed CPython 3.13 venv)
+# so a fresh shell has the lab's data-science kit ready.
+#
+# Polars-first per CLAUDE.md — listed first deliberately. Pandas stays
+# because legacy notebooks and some scikit-learn ecosystem bits still
+# expect it.
+#
+# Read by:
+#   - mac/setup_cli_tools.sh  (today, via `uv pip install $(awk ...)`)
+#   - ATTACKPLAN Phase 5 will lift this to common/install_uv_and_p313.sh
+#     so the same set lands on Ubuntu lab servers too.
+
+- polars
+- pandas
+- numpy
+- requests
+- pyarrow
+- scikit-learn
+- jupyter

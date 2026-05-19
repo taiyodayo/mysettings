@@ -1,0 +1,11 @@
+# Font casks. Separate from darwin_brew_casks.yml so the font set can
+# evolve independently of the app set.
+#
+# Read by:
+#   - mac/setup_cli_tools.sh  (bash → awk → xargs brew install --cask --force)
+
+- font-fira-code-nerd-font
+- font-fira-mono-nerd-font
+- font-noto-sans-cjk
+- font-source-code-pro
+- font-source-sans-3
