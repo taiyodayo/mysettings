@@ -33,5 +33,6 @@
 # -- data / statistics --
 - r
 
-# -- JDK (currently kitted; revisit per ATTACKPLAN if no Java work remains) --
-- temurin
+# Java JDK (temurin) removed per CLAUDE.md HARD RULE (no Java). Existing
+# installs on previously-kitted Macs aren't auto-uninstalled — drop with
+# `brew uninstall --cask temurin` if you want a clean state.
