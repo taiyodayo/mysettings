@@ -126,6 +126,17 @@ fi
 # node@lts via mise — shared with the Ubuntu kit.
 bash "$MYSETTINGS_DIR/common/install_node.sh"
 
+# rustup + cargo-binstall + 10 cargo CLIs (bat eza rg fd delta dust git-trim
+# jless zellij qsv) — shared with the Ubuntu kit. New on Mac in Phase 4:
+# these were previously brew formulae; now they live in ~/.cargo/bin with
+# upstream-current versions. brew copies (if any) get flagged by
+# check_tools.sh and can be uninstalled per its fix_print hints.
+bash "$MYSETTINGS_DIR/dotfiles/run_onchange_install-rustup-and-cargo-tools.sh"
+# rustup's installer appends `source ~/.cargo/env` to ~/.zshrc; activate
+# for THIS shell too so check_tools.sh below sees ~/.cargo/bin on PATH.
+# shellcheck source=/dev/null
+[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
+
 # uv for Python
 brew install uv
 # Ensure we have the latest 3.13 in uv's registry これをしないと妙に古いバージョンになる事がある

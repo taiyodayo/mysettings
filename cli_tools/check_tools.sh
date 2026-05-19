@@ -178,82 +178,78 @@ check_rust() {
     fi
 }
 
-# --- bat (apt; symlinked from /usr/local/bin/bat → /usr/bin/batcat on Ubuntu) ---
-check_bat() {
-    if [ "$OS" = "Darwin" ]; then
-        # Mac: brew install bat. Canonical: $brew_prefix/bin/bat.
-        if ! command -v bat >/dev/null 2>&1; then
-            skip "bat: not installed"
-            return
-        fi
-        local canon="$brew_prefix/bin/bat"
-        local r; r=$(command -v bat)
-        if [ "$r" = "$canon" ]; then
-            ok "bat: $r"
-        else
-            warn "bat: PATH-first at $r (expected $canon)"
-        fi
+# --- cargo-canonical CLIs (bat, eza, rg, fd, delta) ---
+# Phase 4 moved these from apt/brew to ~/.cargo/bin via cargo-binstall so
+# the host keeps up with upstream feature releases. Canonical is always
+# $HOME/.cargo/bin/<binary>; apt/brew copies are now duplicates and get
+# flagged. On Linux, also flag the pre-Phase-4 /usr/local/bin/{bat,fd}
+# symlinks to batcat/fdfind (see check_pre_phase4_symlinks below).
+#
+# check_cargo_tool <binary> <apt_pkg> <apt_bin> [brew_formula]
+#   binary       — the command name on PATH (e.g. "rg", "delta")
+#   apt_pkg      — apt package name (for the "apt purge" fix hint)
+#   apt_bin      — file at /usr/bin/<X> on Linux (e.g. "batcat", "fdfind",
+#                  or just <binary> when no rename — "eza", "delta")
+#   brew_formula — brew formula name; defaults to apt_pkg (override when
+#                  it differs, e.g. apt "fd-find" vs brew "fd")
+check_cargo_tool() {
+    local binary=$1
+    local apt_pkg=$2
+    local apt_bin=$3
+    local brew_formula=${4:-$apt_pkg}
+    local canon="$HOME/.cargo/bin/$binary"
+
+    # Skip when not installed anywhere we'd look.
+    if ! command -v "$binary" >/dev/null 2>&1 \
+       && [ ! -e "$canon" ] \
+       && { [ "$OS" = "Darwin" ] || [ ! -e "/usr/bin/$apt_bin" ]; } \
+       && { [ "$OS" != "Darwin" ] || [ -z "$brew_prefix" ] || [ ! -e "$brew_prefix/bin/$binary" ]; }; then
+        skip "$binary: not installed"
         return
     fi
 
-    # Linux: /usr/bin/batcat from apt, symlinked at /usr/local/bin/bat.
-    if ! command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; then
-        skip "bat/batcat: not installed"
-        return
+    # Mac: brew copy is a Phase-4 leftover.
+    if [ "$OS" = "Darwin" ] && [ -n "$brew_prefix" ] && [ -e "$brew_prefix/bin/$binary" ]; then
+        warn "$binary: brew copy at $brew_prefix/bin/$binary (canonical is $canon)"
+        fix_print "brew uninstall $brew_formula  # cargo binstall handles it now"
     fi
-    local symlink_ok=0
-    if [ -e "/usr/local/bin/bat" ]; then
-        symlink_ok=1
-    elif [ -e "/usr/bin/batcat" ]; then
-        warn "bat: /usr/local/bin/bat symlink missing (batcat present)"
-        fix_print "sudo ln -s /usr/bin/batcat /usr/local/bin/bat"
+
+    # Linux: apt copy is a Phase-4 leftover (and batcat/fdfind are the
+    # rename-renamed binaries that the old kit symlinked).
+    if [ "$OS" != "Darwin" ] && [ -e "/usr/bin/$apt_bin" ]; then
+        warn "$binary: apt copy at /usr/bin/$apt_bin (canonical is $canon)"
+        fix_print "sudo apt-get purge -y $apt_pkg  # cargo binstall handles it now"
     fi
-    # Detect cargo-installed bat duplicate.
-    # Only auto-remove if /usr/local/bin/bat OR /usr/bin/batcat is present
-    # — otherwise we'd leave the user without bat.
-    if [ -e "$HOME/.cargo/bin/bat" ]; then
-        warn "bat: duplicate at ~/.cargo/bin/bat (cargo install) shadows apt"
-        if [ $symlink_ok -eq 1 ] || [ -e "/usr/bin/batcat" ]; then
-            fix_remove "cargo-installed bat" "$HOME/.cargo/bin/bat" "/usr/bin/batcat"
+
+    # Resolution check.
+    if command -v "$binary" >/dev/null 2>&1; then
+        local r; r=$(command -v "$binary")
+        if [ "$r" = "$canon" ]; then
+            ok "$binary: $r"
         else
-            fixmsg "NOT removing ~/.cargo/bin/bat: apt bat / batcat not present — install that first"
+            warn "$binary: PATH-first at $r (expected $canon)"
         fi
-    fi
-    if command -v bat >/dev/null 2>&1; then
-        local r; r=$(command -v bat)
-        case "$r" in
-            /usr/local/bin/bat|/usr/bin/batcat) ok "bat: $r" ;;
-            "$HOME/.cargo/bin/bat") : ;;  # already warned above
-            *) warn "bat: PATH-first at $r (expected /usr/local/bin/bat)" ;;
-        esac
+    elif [ -e "$canon" ]; then
+        # Canonical present but not resolvable — ~/.cargo/bin missing from PATH.
+        warn "$binary: $canon exists but PATH doesn't include ~/.cargo/bin"
+        note "fix: ensure 'source ~/.cargo/env' (or equivalent) lands in ~/.zshrc"
     fi
 }
 
-# --- eza (apt on Linux, brew on Mac) ---
-check_eza() {
-    if ! command -v eza >/dev/null 2>&1 && [ ! -e "$HOME/.cargo/bin/eza" ]; then
-        skip "eza: not installed"
-        return
-    fi
-    local canon
-    if [ "$OS" = "Darwin" ]; then
-        canon="$brew_prefix/bin/eza"
-    else
-        canon="/usr/bin/eza"
-    fi
-    if [ -e "$HOME/.cargo/bin/eza" ]; then
-        warn "eza: duplicate at ~/.cargo/bin/eza (cargo install) shadows apt/brew"
-        # canon was computed above; only remove if apt/brew eza is present.
-        fix_remove "cargo-installed eza" "$HOME/.cargo/bin/eza" "$canon"
-    fi
-    if command -v eza >/dev/null 2>&1; then
-        local r; r=$(command -v eza)
-        if [ "$r" = "$canon" ]; then
-            ok "eza: $r"
-        else
-            warn "eza: PATH-first at $r (expected $canon)"
+# --- pre-Phase-4 symlink cleanup (Linux only) ---
+# Old kit created /usr/local/bin/{bat,fd} → /usr/bin/{batcat,fdfind} so
+# the apt packages exposed the upstream-documented command names. After
+# Phase 4 the apt packages are gone; the symlinks now point at deleted
+# targets and shadow ~/.cargo/bin if PATH puts /usr/local/bin earlier.
+check_pre_phase4_symlinks() {
+    [ "$OS" = "Darwin" ] && return
+    local stale
+    for stale in /usr/local/bin/bat /usr/local/bin/fd; do
+        if [ -L "$stale" ]; then
+            warn "$stale: pre-Phase-4 symlink (Phase 4 puts bat/fd in ~/.cargo/bin)"
+            fix_print "sudo rm $stale"
         fi
-    fi
+    done
 }
 
 # --- gh (GitHub CLI) ---
@@ -448,8 +444,13 @@ echo
 
 check_claude
 check_rust
-check_bat
-check_eza
+# Cargo-canonical CLIs (Phase 4). Args: binary apt_pkg apt_bin [brew_formula]
+check_cargo_tool bat   bat       batcat
+check_cargo_tool eza   eza       eza
+check_cargo_tool rg    ripgrep   rg
+check_cargo_tool fd    fd-find   fdfind     fd
+check_cargo_tool delta git-delta delta
+check_pre_phase4_symlinks
 check_gh
 check_mise
 check_uv

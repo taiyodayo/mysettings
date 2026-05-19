@@ -37,16 +37,6 @@ apt-get upgrade -y
 awk '/^- / { print $2 }' "$SCRIPT_DIR/packages/linux_base.yml" \
   | xargs -r apt-get install -y
 
-# Debian/Ubuntu ship bat as /usr/bin/batcat and fd as /usr/bin/fdfind (renames
-# dodge long-dead package-name conflicts). Add `bat` / `fd` symlinks so the
-# upstream-documented command names work. Idempotent: only created if missing.
-if [ ! -e /usr/local/bin/bat ]; then
-    ln -s /usr/bin/batcat /usr/local/bin/bat
-fi
-if [ ! -e /usr/local/bin/fd ]; then
-    ln -s /usr/bin/fdfind /usr/local/bin/fd
-fi
-
 # yq (mikefarah/yq, Go-based YAML processor — not the python-yq that apt ships
 # as `yq`). snap is the upstream-recommended Linux distribution channel.
 # Idempotent: snap install is a no-op if already present.
@@ -384,39 +374,17 @@ bash "$MYSETTINGS_DIR/common/install_bun.sh"
 # the current shell). dot_zshrc.tmpl picks it up via `[ -d "$HOME/.bun" ]`.
 [ -d "$HOME/.bun" ] && export PATH="$HOME/.bun/bin:$PATH"
 
-# rustup (公式インストーラー) — per-user Rust toolchain in ~/.cargo.
-# Idempotent: when rustup is already present we just self-update + update
-# the stable channel; otherwise run the official curl|sh installer. The
-# installer prepends ~/.cargo/bin to PATH via shell rc (its own logic is
-# grep-guarded so re-runs don't duplicate). System rustc/cargo (apt) were
-# purged in the root section above so they can't shadow ~/.cargo/bin.
-# 詳細: https://rustup.rs
-if command -v rustup >/dev/null 2>&1; then
-    rustup self update
-    rustup update stable
-else
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-      | sh -s -- -y --default-toolchain stable
-fi
-# Activate cargo env for the rest of this here-doc so `cargo install` is
-# resolvable immediately (not just in future login shells).
+# rustup + the cargo CLI route — shared with the Mac kit. Single script
+# installs rustup (or self-updates), cargo-binstall, and the 10-tool
+# inventory (bat eza rg fd delta dust git-trim jless zellij qsv). System
+# rustc/cargo (apt) were purged in the root section above so they can't
+# shadow ~/.cargo/bin. The script writes ~/.cargo/env which the rustup
+# installer appends to ~/.zshrc for future shells.
+bash "$MYSETTINGS_DIR/dotfiles/run_onchange_install-rustup-and-cargo-tools.sh"
+# Source cargo env so the rest of THIS heredoc (and check_tools.sh below)
+# can resolve ~/.cargo/bin without waiting for a re-login.
 # shellcheck source=/dev/null
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
-
-# cargo-installed CLIs. `cargo install` is idempotent: it skips when the
-# requested version is already installed and rebuilds only on upgrade.
-# --locked uses the crate's pinned Cargo.lock for deterministic builds.
-# These four aren't in Ubuntu apt (or aren't reliably new enough); the
-# rest (ripgrep, zoxide, git-delta, …) come from apt above.
-#   du-dust  → dust binary
-#   jless    → JSON pager
-#   zellij   → terminal multiplexer
-#   qsv      → CSV swiss-army knife (--features apply enables data-cleanup ops)
-cargo install --locked git-trim
-cargo install --locked du-dust
-cargo install --locked jless
-cargo install --locked zellij
-cargo install --locked qsv --features apply
 
 # fvm + Flutter — shared with the Mac kit. Skip if dart didn't install
 # (root-block install_dart.sh would have failed; common script gates on

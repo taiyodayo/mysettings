@@ -57,20 +57,6 @@
         update_cache: true
         cache_valid_time: 3600
 
-    # Debian/Ubuntu rename bat → batcat and fd-find → fdfind to dodge long-dead
-    # package-name conflicts. Restore upstream-documented command names.
-    - name: Symlink /usr/local/bin/bat → /usr/bin/batcat
-      ansible.builtin.file:
-        src: /usr/bin/batcat
-        dest: /usr/local/bin/bat
-        state: link
-
-    - name: Symlink /usr/local/bin/fd → /usr/bin/fdfind
-      ansible.builtin.file:
-        src: /usr/bin/fdfind
-        dest: /usr/local/bin/fd
-        state: link
-
     # yq (mikefarah/yq, Go-based YAML processor) — apt ships python-yq under
     # the same name, which is a different tool. snap is upstream's distribution
     # channel for the Go binary.
@@ -554,6 +540,10 @@
     # evaluates on the controller in the invoker's context, ignoring become.
     target_user: "{{ lookup('env', 'SUDO_USER') | default(lookup('env', 'USER'), true) }}"
     user_home: "/home/{{ target_user }}"
+    # Repo root — needed by the user layer to invoke dotfiles/ scripts.
+    # Mirrors the system-layer vars block; redefined here because Ansible
+    # play-level vars don't cross plays.
+    mysettings_repo_dir: "{{ playbook_dir | dirname }}"
     git_user_name: "taiyo@{{ ansible_facts['hostname'] }} default"
     git_user_email: "taiyodayo@gmail.com"
 
@@ -609,48 +599,29 @@
     - name: Include common_bun tasks
       ansible.builtin.include_tasks: tasks/common_bun.yml
 
-    # rustup — per-user Rust toolchain in ~/.cargo. apt rustc/cargo were purged
-    # in the system block above so they can't shadow ~/.cargo/bin.
-    - name: Install rustup for target user
+    # rustup + cargo-binstall + 10 cargo CLIs (bat eza rg fd delta dust
+    # git-trim jless zellij qsv) — shared with the Mac kit. Single script
+    # installs rustup (or self-updates), cargo-binstall, and the full tool
+    # inventory. apt rustc/cargo were purged in the system block so they
+    # can't shadow ~/.cargo/bin. The script is per-tool tolerant — a flaky
+    # download / OOM on one crate doesn't sink the rest.
+    - name: Install rustup + cargo tools via dotfiles script
       become_user: "{{ target_user }}"
-      ansible.builtin.shell: |
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-          | sh -s -- -y --default-toolchain stable
-      args:
-        creates: "{{ user_home }}/.cargo/bin/rustup"
-
-    - name: Update rustup + stable toolchain
-      become_user: "{{ target_user }}"
-      ansible.builtin.shell: |
-        . "{{ user_home }}/.cargo/env"
-        rustup self update
-        rustup update stable
-      args:
-        executable: /bin/bash
-      changed_when: false
-
-    # cargo-installed CLIs not packaged in apt. `cargo install` is idempotent
-    # (skips when the requested version is already installed; rebuilds only on
-    # upgrade). --locked uses the crate's pinned Cargo.lock.
-    # Tolerant per-item: each cargo install is heavy (qsv ≈ 10 min, can OOM
-    # on small VMs, can fail on missing system libs). A single crate failing
-    # shouldn't block the others or the rest of the playbook.
-    - name: Install cargo CLIs (git-trim, du-dust, jless, zellij, qsv)
-      become_user: "{{ target_user }}"
-      ansible.builtin.shell: |
-        . "{{ user_home }}/.cargo/env"
-        cargo install --locked {{ item.crate }}{{ ' --features ' ~ item.features if item.features is defined else '' }}
-      args:
-        executable: /bin/bash
-        creates: "{{ user_home }}/.cargo/bin/{{ item.binary }}"
-      register: cargo_installs
+      ansible.builtin.command: bash {{ mysettings_repo_dir }}/dotfiles/run_onchange_install-rustup-and-cargo-tools.sh
+      environment:
+        # rustup curl-pipe-sh installer; cargo binstall fetches via curl.
+        # ~/.cargo/bin first so re-runs find rustup/cargo from the prior install.
+        PATH: "{{ user_home }}/.cargo/bin:{{ user_home }}/.local/bin:/usr/local/bin:/usr/bin:/bin"
+      register: cargo_tools
+      changed_when: "'Installing' in (cargo_tools.stdout | default('')) or 'updated' in (cargo_tools.stdout | default(''))"
+      # Tolerant: the script is internally tolerant per-tool, but the
+      # outer install (rustup self-update on a stale system) can blip.
       ignore_errors: true
-      loop:
-        - { crate: git-trim, binary: git-trim }
-        - { crate: du-dust, binary: dust }
-        - { crate: jless,   binary: jless }
-        - { crate: zellij,  binary: zellij }
-        - { crate: qsv,     binary: qsv, features: apply }
+
+    - name: Warn if cargo tools install reported failures
+      ansible.builtin.debug:
+        msg: "WARNING: cargo tools script exited non-zero — check {{ cargo_tools.stdout_lines | default([]) | join(' / ') }} and re-run kit or `bash dotfiles/run_onchange_install-rustup-and-cargo-tools.sh` later."
+      when: cargo_tools.failed | default(false)
 
     # fvm + Flutter — shared with the Mac kit via tasks/common_fvm.yml.
     - name: Include common_fvm tasks

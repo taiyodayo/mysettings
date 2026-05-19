@@ -7,9 +7,10 @@
 # Editing this file is the canonical way to add/remove apt packages.
 # See packages/README.md for the consumer recipe.
 #
-# Modern CLI tools (bat, eza, ripgrep, fd-find, git-delta) stay here for
-# now; ATTACKPLAN Phase 4 moves them to ~/.cargo/bin so the host keeps up
-# with upstream feature releases.
+# Phase 4 moved bat, eza, ripgrep, fd-find, git-delta off this list — they
+# now live in ~/.cargo/bin via cargo-binstall (see
+# dotfiles/run_onchange_install-rustup-and-cargo-tools.sh) so the host
+# keeps up with upstream feature releases.
 
 # -- base system --
 - zsh
@@ -38,14 +39,9 @@
 - dirmngr
 - snapd
 
-# -- modern CLI (apt names; some differ from brew, e.g. fd-find vs fd) --
-- bat
-- eza
-- ripgrep
+# -- modern CLI staying on apt (cargo route covers the fast-moving ones) --
 - jq
-- fd-find
 - zoxide
-- git-delta
 - duf
 - btop
 - hyperfine
