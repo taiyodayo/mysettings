@@ -44,6 +44,11 @@
       - /Applications/Visual Studio Code.app
       - /Applications/Xcode.app
 
+    # iTerm2 plist: default `force: false` preserves user customisations on
+    # re-kit. Flip with `-e force_iterm_plist=true` to overwrite from the
+    # lab default (a `.backup` is dropped alongside).
+    force_iterm_plist: false
+
   tasks:
     # OS guard — kitting.yml's cross-platform dispatcher imports this
     # playbook unconditionally. `meta: end_play` here cleanly skips on
@@ -51,6 +56,20 @@
     - name: Skip mac_kitting on non-Darwin hosts
       ansible.builtin.meta: end_play
       when: ansible_facts['os_family'] != 'Darwin'
+
+    # Refuse to kit as root: brew refuses root, and every per-user path
+    # below (~/.cargo, ~/.local, ~/p313, Library/Preferences) belongs to
+    # the invoking user.
+    - name: Fail fast if target_user is root or empty
+      ansible.builtin.assert:
+        that:
+          - target_user is defined
+          - target_user | length > 0
+          - target_user != 'root'
+        fail_msg: |
+          target_user resolved to '{{ target_user | default("") }}'. Re-invoke
+          as your normal user (`cd automated && make kitting`) or pass
+          `-e target_user=<name>` explicitly. brew refuses to run as root.
 
     # ---- brew preflight ----
 
@@ -101,6 +120,16 @@
         user_install: true
       environment:
         PATH: "{{ brew_prefix }}/opt/ruby/bin:/usr/local/bin:/usr/bin:/bin"
+      # Tolerant: rubygems.org occasionally 5xx's; xcodeproj is only needed
+      # for the iOS / CocoaPods workflow and not all Mac kits do that work.
+      # Let the rest of the play complete.
+      register: gem_xcodeproj
+      ignore_errors: true
+
+    - name: Warn if xcodeproj gem install failed
+      ansible.builtin.debug:
+        msg: "WARNING: gem install xcodeproj failed — continuing without it. Re-run kit or `gem install --user-install xcodeproj` later."
+      when: gem_xcodeproj.failed | default(false)
 
     # ---- iTerm2 plist ----
 
@@ -115,10 +144,12 @@
         src: "{{ mysettings_repo_dir }}/mac/resources/com.googlecode.iterm2.plist"
         dest: "{{ user_home }}/Library/Preferences/com.googlecode.iterm2.plist"
         mode: "0644"
-        # Don't overwrite user customisations on re-runs (the original
-        # bash kit also only copies if iterm2 cask is present, which we
-        # rely on the brew_casks step above to satisfy).
-        force: false
+        # Default behaviour preserves user customisations on re-runs (the
+        # original bash kit only copied when the file was absent). Pass
+        # `-e force_iterm_plist=true` to overwrite from the lab default;
+        # the existing plist is preserved as `.backup` in that case.
+        force: "{{ force_iterm_plist | bool }}"
+        backup: "{{ force_iterm_plist | bool }}"
 
     # ---- Dock + menu bar defaults ----
 

@@ -40,6 +40,12 @@
       - r-cran-renv
       - r-cran-languageserver
       - r-cran-httpgd
+    # Default to `safe` apt upgrade (security + bugfix only) so a re-kit
+    # of a healthy production lab server doesn't pull in feature updates
+    # that restart services or require reboot. Opt in to full upgrade
+    # with `-e full_upgrade=true` (the original behaviour) for fresh
+    # kitting / scheduled maintenance windows.
+    full_upgrade: false
   tasks:
     # OS guard — kitting.yml's cross-platform dispatcher imports this
     # playbook unconditionally. `meta: end_play` here cleanly skips the
@@ -49,12 +55,41 @@
       ansible.builtin.meta: end_play
       when: ansible_facts['os_family'] != 'Debian'
 
+    # Refuse to run as root: target_user is the user that owns mise / uv /
+    # ~/.zshrc / ~/p313 / ~/.cargo, and lookup('env','USER') in a sudo -s
+    # shell resolves to root → all per-user paths land in /home/root which
+    # doesn't exist. Catch this early instead of debugging dpkg fallout.
+    - name: Fail fast if target_user is root or empty
+      ansible.builtin.assert:
+        that:
+          - target_user is defined
+          - target_user | length > 0
+          - target_user != 'root'
+        fail_msg: |
+          target_user resolved to '{{ target_user | default("") }}'. The kit is
+          designed for a normal user (mise / uv / ~/.zshrc / ~/p313 / ~/.cargo
+          live in $HOME). Re-invoke as your normal user with
+            cd automated && make kit --ask-become-pass
+          or pass `-e target_user=<name>` explicitly.
+
+    # Some distros / minimal images ship without /etc/apt/keyrings. Several
+    # apt-key-fetch tasks below (gh, docker, dart, mise via common_mise.yml)
+    # all write into this directory; create it explicitly so the playbook
+    # isn't relying on include-order luck.
+    - name: Ensure /etc/apt/keyrings exists
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
     # Keep the host on current upstream before any of our own installs run.
     # Version-sensitive work moves to Docker, not host pins (ATTACKPLAN §3.6).
+    # `safe` by default; `-e full_upgrade=true` switches to the legacy
+    # full-upgrade behaviour.
     - name: Update apt cache and upgrade installed packages
       ansible.builtin.apt:
         update_cache: true
-        upgrade: 'yes'
+        upgrade: "{{ 'yes' if (full_upgrade | bool) else 'safe' }}"
 
     # ---- base packages, timezone, sysctl ----
 
@@ -562,6 +597,20 @@
     - name: Skip ubuntu_kitting user layer on non-Debian hosts
       ansible.builtin.meta: end_play
       when: ansible_facts['os_family'] | default('') != 'Debian'
+
+    # Symmetric with the system-layer assertion. target_user is the owner
+    # of every per-user install path below (~/.cargo, ~/.local, ~/p313,
+    # ~/.zshrc); resolving to root means we'd be kitting /home/root.
+    - name: Fail fast if target_user is root or empty
+      ansible.builtin.assert:
+        that:
+          - target_user is defined
+          - target_user | length > 0
+          - target_user != 'root'
+        fail_msg: |
+          target_user resolved to '{{ target_user | default("") }}'. Re-invoke
+          as your normal user (`cd automated && make kit --ask-become-pass`)
+          or pass `-e target_user=<name>` explicitly.
 
     # linuxbrew is DEPRECATED on Linux. apt + curl-pipe-sh covers everything
     # (gh, mise, bat, eza, rustup, uv, claude-native, bun). Linuxbrew creates
