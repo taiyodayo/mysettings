@@ -23,24 +23,31 @@ MYSETTINGS_DIR="$SCRIPT_DIR"
 # kicked off here — small, but App Store is the preferred install channel
 # for VPN clients (sandboxed + entitlement-managed by Apple).
 #
-# Prereq: user must be signed into the Mac App Store. If not, we warn and
-# skip cleanly so the rest of the kit completes; the user can `mas install
-# 497799835 1451685025` later once they sign in.
-brew install mas
-if mas account >/dev/null 2>&1; then
+# Prereq: user must be signed into the Mac App Store. If not (common in
+# Apple Silicon VMs, which disable MAS by design), we warn and skip cleanly
+# so the rest of the kit completes; the user can `mas install 497799835
+# 1451685025` later once they sign in (or never, if it's a throwaway VM).
+#
+# The `if ! brew install mas` form is set -e safe — a failure in the if
+# condition doesn't trip pipefail. Same for `mas account` below. So even
+# a brew flake on the mas formula itself can't sink the rest of the kit.
+if ! brew install mas; then
+    echo "WARNING: brew install mas failed — skipping App Store installs."
+    echo "  → After fixing brew, manually: mas install 497799835 1451685025"
+    export install_pid=""
+elif ! mas account >/dev/null 2>&1; then
+    echo "WARNING: not signed into the Mac App Store (or unavailable — common in Apple Silicon VMs)."
+    echo "  → Open the App Store app and sign in, then re-run setup_mailab_mac.sh,"
+    echo "    or install Xcode + WireGuard manually after this script completes:"
+    echo "      mas install 497799835 1451685025"
+    echo "  Continuing without background MAS downloads."
+    export install_pid=""
+else
     echo "App Store: $(mas account) — starting background downloads (Xcode + WireGuard)"
     nohup mas install 497799835  > /tmp/xcode-install.log     2>&1 &
     export install_pid=$!
     # WireGuard is small + not waited on (orphan completion is fine).
     nohup mas install 1451685025 > /tmp/wireguard-install.log 2>&1 &
-else
-    echo "WARNING: not signed into the Mac App Store."
-    echo "  → Open the App Store app and sign in, then re-run setup_mailab_mac.sh,"
-    echo "    or install Xcode + WireGuard manually after this script completes:"
-    echo "      mas install 497799835 1451685025"
-    echo "  Continuing without background MAS downloads."
-    # Empty install_pid → parent's wait is a no-op (guarded in setup_mailab_mac.sh).
-    export install_pid=""
 fi
 
 # ---- Bulk brew install ---------------------------------------------------
