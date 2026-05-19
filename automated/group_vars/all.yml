@@ -1,0 +1,19 @@
+---
+# Vars shared by every host regardless of OS. Loaded when an inventory
+# groups a host into `all` (which is automatic — `all` is implicit).
+#
+# target_user / mysettings_repo_dir are inlined in each kitting playbook
+# today because Ansible evaluates group_vars only after inventory parsing
+# and the local-controller `-i localhost,` short-form doesn't always pick
+# them up reliably. This file is the canonical-spec location; the
+# playbook copies act as a backup.
+
+# Where to find the user's local clone of mysettings. The playbooks
+# default to `playbook_dir | dirname` which resolves to the repo root
+# when invoked from automated/. Override on remote fleet runs.
+mysettings_repo_dir: "{{ playbook_dir | dirname }}"
+
+# The user that owns brew / mise / uv / ~/.zshrc. On the local
+# controller this resolves to the invoker via env. On remote fleet
+# runs, override with `-e target_user=<name>` or set ansible_user.
+target_user: "{{ lookup('env', 'SUDO_USER') | default(lookup('env', 'USER'), true) }}"

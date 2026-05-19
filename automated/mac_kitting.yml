@@ -1,0 +1,334 @@
+---
+# Declarative replacement for the bulk of mac/setup_cli_tools.sh +
+# mac/setup_gui_apps.sh + mac/brew_tidyverse.sh.
+#
+# Out of scope (stays in setup_mailab_mac.sh as a post-Ansible step):
+#   - mas install 497799835 (Xcode from App Store) — interactive sign-in
+#   - wait $install_pid (Xcode install completion)
+#   - AppleScript bits (Android Studio menu interaction)
+#
+# Usage:
+#   ansible-playbook -i localhost, --connection=local mac_kitting.yml
+#   make kitting   # via the cross-platform dispatcher
+#
+# Single play, runs as the invoking user. `become: false` because brew /
+# defaults / dockutil all run as the user, not root.
+
+- name: Mac kitting
+  hosts: all
+  become: false
+  gather_facts: true
+
+  vars:
+    target_user: "{{ lookup('env', 'USER') }}"
+    user_home: "/Users/{{ target_user }}"
+    mysettings_repo_dir: "{{ playbook_dir | dirname }}"
+    git_user_name: "taiyo@{{ ansible_facts['hostname'] }} default"
+    git_user_email: "taiyodayo@gmail.com"
+
+    # Canonical brew lists — same files the bash kit reads via awk.
+    brew_system_packages: "{{ lookup('file', mysettings_repo_dir + '/packages/darwin_brew_system.yml') | from_yaml }}"
+    brew_casks: "{{ lookup('file', mysettings_repo_dir + '/packages/darwin_brew_casks.yml') | from_yaml }}"
+    brew_fonts: "{{ lookup('file', mysettings_repo_dir + '/packages/darwin_brew_fonts.yml') | from_yaml }}"
+    brew_r_build_deps: "{{ lookup('file', mysettings_repo_dir + '/packages/darwin_brew_r_build_deps.yml') | from_yaml }}"
+
+    # R packages preloaded via pacman::p_load (mirrors brew_tidyverse.sh).
+    r_pacman_packages:
+      - tidyverse
+      - languageserver
+
+    # Apps to ensure live at the right end of the Dock (mirrors setup_gui_apps.sh).
+    dock_apps:
+      - /Applications/iTerm.app
+      - /Applications/Google Chrome.app
+      - /Applications/Visual Studio Code.app
+      - /Applications/Xcode.app
+
+  tasks:
+    # OS guard — kitting.yml's cross-platform dispatcher imports this
+    # playbook unconditionally. `meta: end_play` here cleanly skips on
+    # non-Darwin hosts so this file can stay `hosts: all`-shaped.
+    - name: Skip mac_kitting on non-Darwin hosts
+      ansible.builtin.meta: end_play
+      when: ansible_facts['os_family'] != 'Darwin'
+
+    # ---- brew preflight ----
+
+    - name: Verify brew is installed
+      ansible.builtin.command: brew --version
+      register: brew_check
+      changed_when: false
+      failed_when: brew_check.rc != 0
+
+    - name: Resolve brew prefix
+      ansible.builtin.command: brew --prefix
+      register: brew_prefix_cmd
+      changed_when: false
+
+    - name: Set brew_prefix fact
+      ansible.builtin.set_fact:
+        brew_prefix: "{{ brew_prefix_cmd.stdout }}"
+
+    # ---- brew installs (formulae, casks, fonts) ----
+
+    - name: Install brew formulae (packages/darwin_brew_system.yml)
+      community.general.homebrew:
+        name: "{{ brew_system_packages }}"
+        state: present
+
+    - name: Install brew casks (packages/darwin_brew_casks.yml)
+      community.general.homebrew_cask:
+        name: "{{ brew_casks }}"
+        state: present
+        # --force matches the shell kit's `brew install --cask --force` —
+        # needed to overwrite previously installed apps without prompts.
+        install_options: force
+
+    - name: Install font casks (packages/darwin_brew_fonts.yml)
+      community.general.homebrew_cask:
+        name: "{{ brew_fonts }}"
+        state: present
+        install_options: force
+
+    # ---- Ruby + CocoaPods workflow ----
+    # ruby + cocoapods come in via brew_system_packages above. Adding
+    # xcodeproj is the one extra gem the iOS workflow needs.
+
+    - name: Install xcodeproj gem
+      community.general.gem:
+        name: xcodeproj
+        state: present
+        user_install: true
+      environment:
+        PATH: "{{ brew_prefix }}/opt/ruby/bin:/usr/local/bin:/usr/bin:/bin"
+
+    # ---- iTerm2 plist ----
+
+    - name: Stat iTerm2 plist source
+      ansible.builtin.stat:
+        path: "{{ mysettings_repo_dir }}/mac/resources/com.googlecode.iterm2.plist"
+      register: iterm_plist
+
+    - name: Copy iTerm2 default preferences
+      when: iterm_plist.stat.exists
+      ansible.builtin.copy:
+        src: "{{ mysettings_repo_dir }}/mac/resources/com.googlecode.iterm2.plist"
+        dest: "{{ user_home }}/Library/Preferences/com.googlecode.iterm2.plist"
+        mode: "0644"
+        # Don't overwrite user customisations on re-runs (the original
+        # bash kit also only copies if iterm2 cask is present, which we
+        # rely on the brew_casks step above to satisfy).
+        force: false
+
+    # ---- Dock + menu bar defaults ----
+
+    - name: Hide menu bar (_HIHideMenuBar)
+      community.general.osx_defaults:
+        domain: NSGlobalDomain
+        key: _HIHideMenuBar
+        type: bool
+        value: true
+
+    - name: Auto-hide Dock
+      community.general.osx_defaults:
+        domain: com.apple.dock
+        key: autohide
+        type: bool
+        value: true
+
+    - name: Enable Dock magnification
+      community.general.osx_defaults:
+        domain: com.apple.dock
+        key: magnification
+        type: bool
+        value: true
+
+    - name: Set Dock magnified icon size
+      community.general.osx_defaults:
+        domain: com.apple.dock
+        key: largesize
+        type: int
+        value: 96
+
+    - name: Set Dock regular icon size
+      community.general.osx_defaults:
+        domain: com.apple.dock
+        key: tilesize
+        type: int
+        value: 48
+
+    - name: Restart Dock + Finder so defaults take effect
+      ansible.builtin.command: "killall {{ item }}"
+      loop:
+        - Dock
+        - Finder
+      # `killall` returns non-zero when the process isn't running (e.g.
+      # fresh boot / headless) — tolerate.
+      failed_when: false
+      changed_when: false
+
+    # ---- Dock app management ----
+    # dockutil came in via brew_system_packages. We --remove then --add
+    # so the position assertion stays idempotent across re-runs.
+
+    - name: Pin apps to the end of the Dock
+      ansible.builtin.shell: |
+        set -o pipefail
+        dockutil --remove "{{ item }}" --no-restart 2>/dev/null || true
+        dockutil --add "{{ item }}" --position end --no-restart
+      args:
+        executable: /bin/bash
+      loop: "{{ dock_apps }}"
+      register: dockutil_runs
+      # dockutil doesn't print a consistent "added"/"unchanged" — treat
+      # as never-changed for status purposes; the kit still pins them.
+      changed_when: false
+      failed_when: false
+
+    - name: Apply Dock changes after pinning
+      ansible.builtin.command: killall Dock
+      failed_when: false
+      changed_when: false
+
+    # ---- R + tidyverse (brew_tidyverse.sh equivalent) ----
+
+    - name: Install R build deps (packages/darwin_brew_r_build_deps.yml)
+      community.general.homebrew:
+        name: "{{ brew_r_build_deps }}"
+        state: present
+
+    - name: Install R (cask)
+      community.general.homebrew_cask:
+        name: r
+        state: present
+
+    - name: Ensure ~/.Rprofile has CRAN line
+      ansible.builtin.lineinfile:
+        path: "{{ user_home }}/.Rprofile"
+        line: 'options(repos = c(CRAN = "https://cloud.r-project.org"))'
+        regexp: '^options\(repos = c\(CRAN'
+        create: true
+        mode: "0644"
+
+    - name: Bootstrap pacman (CRAN install on first run)
+      ansible.builtin.shell: |
+        set -o pipefail
+        Rscript -e 'if (!require("pacman", quietly=TRUE)) install.packages("pacman", quiet=TRUE)'
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "{{ brew_prefix }}/bin:/usr/local/bin:/usr/bin:/bin"
+      register: pacman_install
+      changed_when: "'installing' in (pacman_install.stderr | default(''))"
+      # Tolerant — R install via brew cask occasionally hits notarization /
+      # download flakes; let the rest of the play complete.
+      ignore_errors: true
+
+    - name: Install R packages via pacman::p_load
+      ansible.builtin.shell: |
+        set -o pipefail
+        Rscript -e 'pacman::p_load({{ r_pacman_packages | join(", ") }})'
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "{{ brew_prefix }}/bin:/usr/local/bin:/usr/bin:/bin"
+      register: pacman_load
+      changed_when: "'installing' in (pacman_load.stderr | default(''))"
+      when: not (pacman_install.failed | default(false))
+      ignore_errors: true
+
+    # ---- Shared common_*.yml tasks (mise, dart, bun, node, fvm, git) ----
+
+    - name: Include common_mise tasks
+      ansible.builtin.include_tasks: tasks/common_mise.yml
+
+    - name: Include common_dart tasks
+      ansible.builtin.include_tasks: tasks/common_dart.yml
+
+    - name: Include common_bun tasks
+      ansible.builtin.include_tasks: tasks/common_bun.yml
+
+    - name: Include common_node tasks
+      ansible.builtin.include_tasks: tasks/common_node.yml
+
+    - name: Include common_fvm tasks
+      ansible.builtin.include_tasks: tasks/common_fvm.yml
+
+    - name: Include common_git tasks
+      ansible.builtin.include_tasks: tasks/common_git.yml
+
+    # ---- rustup + cargo tools ----
+
+    - name: Install rustup + cargo tools via dotfiles script
+      ansible.builtin.command: bash {{ mysettings_repo_dir }}/dotfiles/run_onchange_install-rustup-and-cargo-tools.sh
+      environment:
+        # ~/.cargo/bin first so re-runs find existing rustup; brew_prefix
+        # second so curl / gpg / etc. resolve from brew on PATH.
+        PATH: "{{ user_home }}/.cargo/bin:{{ brew_prefix }}/bin:/usr/local/bin:/usr/bin:/bin"
+      register: cargo_tools
+      changed_when: "'Installing' in (cargo_tools.stdout | default('')) or 'updated' in (cargo_tools.stdout | default(''))"
+      ignore_errors: true
+
+    - name: Warn if cargo tools install reported failures
+      ansible.builtin.debug:
+        msg: "WARNING: cargo tools script exited non-zero — re-run kit or `bash dotfiles/run_onchange_install-rustup-and-cargo-tools.sh` later."
+      when: cargo_tools.failed | default(false)
+
+    # ---- uv + p313 + lab DS preload ----
+
+    - name: Install uv + p313 venv + lab DS preload
+      ansible.builtin.command: bash {{ mysettings_repo_dir }}/common/install_uv_and_p313.sh
+      environment:
+        # brew_prefix first so brew-installed uv wins over any
+        # ~/.local/bin/uv left by a curl installer.
+        PATH: "{{ brew_prefix }}/bin:{{ user_home }}/.local/bin:/usr/local/bin:/usr/bin:/bin"
+      register: uv_p313
+      changed_when: "'Installed' in (uv_p313.stdout | default('')) or 'Creating virtual environment' in (uv_p313.stdout | default(''))"
+      ignore_errors: true
+
+    - name: Warn if uv + p313 install reported failures
+      ansible.builtin.debug:
+        msg: "WARNING: uv/p313 script exited non-zero — re-run kit or `bash common/install_uv_and_p313.sh` later."
+      when: uv_p313.failed | default(false)
+
+    # ---- Imperative ~/.zshrc append for pre-chezmoi machines ----
+    # dot_zshrc.tmpl handles all of these for chezmoi-managed shells;
+    # the blockinfile below covers pre-chezmoi Mac kits. Mirrors the
+    # mise+PATH blockinfile in ubuntu_kitting.yml (user layer).
+
+    - name: Activate mise + p313 + PATH adjustments in ~/.zshrc
+      ansible.builtin.blockinfile:
+        path: "{{ user_home }}/.zshrc"
+        create: true
+        mode: "0644"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - mise + PATH"
+        block: |
+          eval "$(mise activate zsh)"
+          export PATH="$HOME/mysettings/cli_tools:$PATH"
+          [ -f "$HOME/p313/bin/activate" ] && source "$HOME/p313/bin/activate"
+
+    # ---- Post-kit health checks ----
+
+    - name: Run login_check.sh (auth status for gh / claude / codex / gemini)
+      ansible.builtin.command: "{{ mysettings_repo_dir }}/cli_tools/login_check.sh"
+      register: login_check
+      changed_when: false
+      failed_when: false
+      environment:
+        PATH: "{{ user_home }}/mysettings/cli_tools:{{ user_home }}/.local/bin:{{ user_home }}/.cargo/bin:{{ user_home }}/.bun/bin:{{ brew_prefix }}/bin:/usr/local/bin:/usr/bin:/bin"
+
+    - name: Show login_check.sh output
+      ansible.builtin.debug:
+        var: login_check.stdout_lines
+
+    - name: Run check_tools.sh (canonical-install audit)
+      ansible.builtin.command: "{{ mysettings_repo_dir }}/cli_tools/check_tools.sh"
+      register: check_tools
+      changed_when: false
+      failed_when: false
+      environment:
+        PATH: "{{ user_home }}/mysettings/cli_tools:{{ user_home }}/.local/bin:{{ user_home }}/.cargo/bin:{{ user_home }}/.bun/bin:{{ brew_prefix }}/bin:/usr/local/bin:/usr/bin:/bin"
+
+    - name: Show check_tools.sh output
+      ansible.builtin.debug:
+        var: check_tools.stdout_lines

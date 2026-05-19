@@ -1,0 +1,6 @@
+---
+# Linux-only vars. Loaded when a host belongs to the `linux` inventory
+# group (set up via `group_by: key=os_{{ ansible_facts['os_family'] }}` or
+# explicitly in inventory.yml).
+
+user_home: "/home/{{ target_user }}"

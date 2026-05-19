@@ -41,6 +41,14 @@
       - r-cran-languageserver
       - r-cran-httpgd
   tasks:
+    # OS guard — kitting.yml's cross-platform dispatcher imports this
+    # playbook unconditionally. `meta: end_play` here cleanly skips the
+    # whole system-layer play on non-Debian hosts (Mac, RHEL, etc.) so
+    # the playbook can stay `hosts: all`-shaped for backward compat.
+    - name: Skip ubuntu_kitting system layer on non-Debian hosts
+      ansible.builtin.meta: end_play
+      when: ansible_facts['os_family'] != 'Debian'
+
     # Keep the host on current upstream before any of our own installs run.
     # Version-sensitive work moves to Docker, not host pins (ATTACKPLAN §3.6).
     - name: Update apt cache and upgrade installed packages
@@ -548,6 +556,13 @@
     git_user_email: "taiyodayo@gmail.com"
 
   tasks:
+    # OS guard — symmetric with the system-layer play above. Facts gathered
+    # in the system-layer play are in the in-memory cache so this works
+    # even though gather_facts: false here.
+    - name: Skip ubuntu_kitting user layer on non-Debian hosts
+      ansible.builtin.meta: end_play
+      when: ansible_facts['os_family'] | default('') != 'Debian'
+
     # linuxbrew is DEPRECATED on Linux. apt + curl-pipe-sh covers everything
     # (gh, mise, bat, eza, rustup, uv, claude-native, bun). Linuxbrew creates
     # a parallel package universe at /home/linuxbrew/ that shadows our
