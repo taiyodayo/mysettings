@@ -65,8 +65,15 @@ osascript -e 'tell application id "com.google.android.studio" to activate' \
           -e 'tell application "System Events" to tell (first process whose bundle identifier is "com.google.android.studio") to click menu item "SDK Manager" of menu "Tools" of menu bar 1'
 
 # xcode のインストール完了を待って、起動
-echo "Xcode のインストールを待っています。完了したら、Xcode を起動します"
-wait $install_pid
+# install_pid は setup_cli_tools.sh の early-MAS ブロックで export される。
+# App Store にサインインしていなかった場合は空文字列 → wait をスキップする。
+if [ -n "${install_pid:-}" ]; then
+    echo "Xcode のインストールを待っています。完了したら、Xcode を起動します"
+    wait "$install_pid"
+else
+    echo "Xcode の background install はスキップ済み (App Store 未サインイン)"
+    echo "  → 後で手動: mas install 497799835 1451685025"
+fi
 # ここ、コマンドで処理してしまうと、Xcode の初回起動時のダイアログが出ない
 # iOS 開発に必要なシミュレータなどコンポーネントのインストールも走らないので、open で起動して手動操作を促す
 # sleep 10
