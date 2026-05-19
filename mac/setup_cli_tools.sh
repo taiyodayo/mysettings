@@ -137,24 +137,18 @@ bash "$MYSETTINGS_DIR/dotfiles/run_onchange_install-rustup-and-cargo-tools.sh"
 # shellcheck source=/dev/null
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 
-# uv for Python
-brew install uv
-# Ensure we have the latest 3.13 in uv's registry これをしないと妙に古いバージョンになる事がある
-uv python install cpython-3.13
-# Create Python venv if not present
-if [ ! -d "$HOME/p313" ]; then
-    uv venv --python cpython-3.13 ~/p313
-fi
-# Add Homebrew to ~/.zshrc if not already there
-if [ ! -f ~/.zshrc ] || ! grep -q "$HOME/p313" ~/.zshrc; then
+# uv + ~/p313 venv + lab DS preload — shared with the Ubuntu kit.
+# Mac path: brew already installed uv via darwin_brew_system.yml; the
+# common script's `uv self update` is a no-op. ~/p313 holds polars,
+# pandas, numpy, etc. (see packages/lab_python.yml). dot_zshrc.tmpl
+# sources the venv's activate on every shell; the imperative ~/.zshrc
+# append below keeps pre-chezmoi machines working.
+bash "$MYSETTINGS_DIR/common/install_uv_and_p313.sh"
+if [ ! -f ~/.zshrc ] || ! grep -Fq 'p313/bin/activate' ~/.zshrc; then
     echo 'source ~/p313/bin/activate' >> ~/.zshrc
 fi
 # shellcheck source=/dev/null
 source "$HOME/p313/bin/activate"
-# Lab DS preload — canonical list in packages/lab_python.yml (Phase 5
-# will lift this to common/ so the same set lands on Linux too).
-awk '/^- / { print $2 }' "$PACKAGES_DIR/lab_python.yml" \
-  | xargs uv pip install
 
 # git global defaults — shared with the Ubuntu kit. This is a behaviour
 # change on Mac (previous Mac kit didn't set git defaults explicitly);

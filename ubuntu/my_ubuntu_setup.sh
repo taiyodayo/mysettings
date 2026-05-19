@@ -362,10 +362,19 @@ fi
 # node@lts via mise — shared with the Mac kit.
 bash "$MYSETTINGS_DIR/common/install_node.sh"
 
-# uv for Python (公式インストーラー - self-update 対応)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-# installer adds ~/.local/bin to PATH via shell profile; activate for this session
+# uv + ~/p313 venv + lab DS preload — shared with the Mac kit. The
+# common script delegates uv install to dotfiles/run_onchange_install-uv.sh
+# (astral.sh's curl installer on Linux), then creates the cpython-3.13
+# venv at ~/p313 and preloads polars, pandas, numpy, etc. per
+# packages/lab_python.yml. dot_zshrc.tmpl sources the venv's activate
+# on every shell; the imperative ~/.zshrc append below keeps
+# pre-chezmoi machines working.
+bash "$MYSETTINGS_DIR/common/install_uv_and_p313.sh"
+# Installer adds ~/.local/bin to ~/.zshrc but not this shell; activate.
 export PATH="$HOME/.local/bin:$PATH"
+if [ ! -f ~/.zshrc ] || ! grep -Fq 'p313/bin/activate' ~/.zshrc; then
+    echo 'source ~/p313/bin/activate' >> ~/.zshrc
+fi
 
 # bun — shared with the Mac kit. cli_tools/llms_update.sh uses `bun add -g`
 # for codex/gemini, so bun must be on PATH before that runs.
