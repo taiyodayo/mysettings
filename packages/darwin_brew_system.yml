@@ -34,8 +34,10 @@
 - subversion
 
 # -- runtime / language managers --
-- bun
-- mise
+# bun + mise moved to common/install_bun.sh + install_mise.sh (Phase 3),
+# so the install path is shared with the Ubuntu kit.
+# uv stays here for now; Phase 5 will lift it into common/install_uv.sh
+# alongside the ~/p313 venv + lab_python.yml preload.
 - uv
 
 # -- GNU userland (Mac ships BSD; we want GNU on PATH) --

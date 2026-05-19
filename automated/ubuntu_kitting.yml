@@ -112,37 +112,10 @@
         state: present
         reload: true
 
-    # ---- mise (apt repo) ----
+    # ---- mise (apt repo) — shared with the Mac kit via tasks/common_mise.yml ----
 
-    - name: Ensure /etc/apt/keyrings exists
-      ansible.builtin.file:
-        path: /etc/apt/keyrings
-        state: directory
-        mode: "0755"
-
-    - name: Fetch mise apt signing key
-      ansible.builtin.get_url:
-        url: https://mise.jdx.dev/gpg-key.pub
-        dest: /etc/apt/keyrings/mise-archive-keyring.asc
-        mode: "0644"
-        force: false
-
-    - name: Dearmor mise key
-      ansible.builtin.command:
-        cmd: gpg --batch --yes --dearmor -o /etc/apt/keyrings/mise-archive-keyring.gpg /etc/apt/keyrings/mise-archive-keyring.asc
-        creates: /etc/apt/keyrings/mise-archive-keyring.gpg
-
-    - name: Add mise apt repo
-      ansible.builtin.apt_repository:
-        repo: "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch={{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'amd64' }}] https://mise.jdx.dev/deb stable main"
-        filename: mise
-        state: present
-
-    - name: Install mise
-      ansible.builtin.apt:
-        name: mise
-        state: present
-        update_cache: true
+    - name: Include common_mise tasks
+      ansible.builtin.include_tasks: tasks/common_mise.yml
 
     # ---- gh (GitHub CLI from cli.github.com) ----
     # Ubuntu-shipped gh lags upstream; always prefer the official apt repo.
@@ -167,39 +140,11 @@
         state: present
         update_cache: true
 
-    # ---- Dart SDK (Google apt repo) ----
-    # Needed for Flutter Version Manager (fvm) via `dart pub global activate`
-    # in the userland block. Replaces linuxbrew dart-sdk + fvm on Linux.
-    # 詳細: https://dart.dev/get-dart
+    # ---- Dart SDK — shared with the Mac kit via tasks/common_dart.yml ----
+    # Needed for Flutter Version Manager (fvm) in the userland block below.
 
-    - name: Install apt-transport-https (Dart repo prereq)
-      ansible.builtin.apt:
-        name: apt-transport-https
-        state: present
-
-    - name: Fetch Google linux signing key (for Dart)
-      ansible.builtin.get_url:
-        url: https://dl-ssl.google.com/linux/linux_signing_key.pub
-        dest: /etc/apt/keyrings/dart.asc
-        mode: "0644"
-        force: false
-
-    - name: Dearmor Dart key
-      ansible.builtin.command:
-        cmd: gpg --batch --yes --dearmor -o /etc/apt/keyrings/dart.gpg /etc/apt/keyrings/dart.asc
-        creates: /etc/apt/keyrings/dart.gpg
-
-    - name: Add Dart apt repo
-      ansible.builtin.apt_repository:
-        repo: "deb [signed-by=/etc/apt/keyrings/dart.gpg arch={{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'amd64' }}] https://storage.googleapis.com/download.dartlang.org/linux/debian stable main"
-        filename: dart_stable
-        state: present
-
-    - name: Install dart
-      ansible.builtin.apt:
-        name: dart
-        state: present
-        update_cache: true
+    - name: Include common_dart tasks
+      ansible.builtin.include_tasks: tasks/common_dart.yml
 
     # ---- docker (docker-ce from Docker Inc, not docker.io) ----
     # Ubuntu's docker.io lags several major versions by mid-LTS cycle.
@@ -649,13 +594,9 @@
           export PATH="$HOME/mysettings/cli_tools:$PATH"
           export PATH="$HOME/.local/bin:$PATH"
 
-    - name: Set global mise node version to lts
-      become_user: "{{ target_user }}"
-      ansible.builtin.command: mise use --global node@lts
-      register: mise_use
-      changed_when: "'already' not in (mise_use.stderr | default(''))"
-      environment:
-        PATH: "{{ user_home }}/.local/bin:/usr/bin:/bin"
+    # node@lts via mise — shared with the Mac kit via tasks/common_node.yml.
+    - name: Include common_node tasks
+      ansible.builtin.include_tasks: tasks/common_node.yml
 
     - name: Install uv (astral.sh) for target user
       become_user: "{{ target_user }}"
@@ -663,15 +604,10 @@
       args:
         creates: "{{ user_home }}/.local/bin/uv"
 
-    # bun — JavaScript runtime + package manager. cli_tools/llms_update.sh
+    # bun — shared with the Mac kit via tasks/common_bun.yml. cli_tools/llms_update.sh
     # uses `bun add -g` for codex/gemini, so bun must be on PATH before that.
-    # Installer is idempotent (upgrades in place), but we gate on creates: for
-    # cleaner Ansible reporting.
-    - name: Install bun for target user
-      become_user: "{{ target_user }}"
-      ansible.builtin.shell: curl -fsSL https://bun.sh/install | bash
-      args:
-        creates: "{{ user_home }}/.bun/bin/bun"
+    - name: Include common_bun tasks
+      ansible.builtin.include_tasks: tasks/common_bun.yml
 
     # rustup — per-user Rust toolchain in ~/.cargo. apt rustc/cargo were purged
     # in the system block above so they can't shadow ~/.cargo/bin.
@@ -716,67 +652,13 @@
         - { crate: zellij,  binary: zellij }
         - { crate: qsv,     binary: qsv, features: apply }
 
-    # fvm — Flutter Version Manager. Dart SDK comes from Google's apt repo
-    # (system block above). fvm lives at ~/.pub-cache/bin/fvm; dot_zshrc.tmpl
-    # picks it up via `[[ -d "$HOME/.pub-cache/bin" ]] && export PATH=...`.
-    # Tolerant: fvm is only needed for Flutter work. `fvm install stable`
-    # downloads ~500MB and frequently hits network blips. The whole block
-    # is non-blocking — kit completes without Flutter on slow/flaky links.
-    - name: Activate fvm via dart pub global
-      become_user: "{{ target_user }}"
-      ansible.builtin.command: dart pub global activate fvm
-      args:
-        creates: "{{ user_home }}/.pub-cache/bin/fvm"
-      environment:
-        PATH: "/usr/lib/dart/bin:{{ user_home }}/.pub-cache/bin:/usr/bin:/bin"
-      register: fvm_activate
-      ignore_errors: true
+    # fvm + Flutter — shared with the Mac kit via tasks/common_fvm.yml.
+    - name: Include common_fvm tasks
+      ansible.builtin.include_tasks: tasks/common_fvm.yml
 
-    - name: Install Flutter stable via fvm
-      become_user: "{{ target_user }}"
-      ansible.builtin.command: fvm install stable
-      args:
-        creates: "{{ user_home }}/fvm/versions/stable"
-      environment:
-        PATH: "{{ user_home }}/.pub-cache/bin:/usr/lib/dart/bin:/usr/bin:/bin"
-      when: not (fvm_activate.failed | default(false))
-      register: fvm_install
-      ignore_errors: true
-
-    - name: Set Flutter stable as fvm global default
-      become_user: "{{ target_user }}"
-      ansible.builtin.command: fvm global stable
-      args:
-        creates: "{{ user_home }}/fvm/default"
-      environment:
-        PATH: "{{ user_home }}/.pub-cache/bin:/usr/lib/dart/bin:/usr/bin:/bin"
-      when: not (fvm_install.failed | default(false))
-      register: fvm_global
-      ignore_errors: true
-
-    - name: Warn if fvm install failed
-      ansible.builtin.debug:
-        msg: "WARNING: fvm/Flutter install failed — continuing. Re-run kit or `fvm install stable && fvm global stable` later."
-      when: (fvm_activate.failed | default(false)) or (fvm_install.failed | default(false)) or (fvm_global.failed | default(false))
-
-    # Git global config. credential.helper=cache keeps HTTPS creds in memory
-    # for 15 min — prefer over `store` so an accidental PAT paste during
-    # `git clone https://...` never hits disk. SSH-based auth is unaffected.
-    # alias.sync depends on git-trim (installed via cargo above).
-    - name: Configure global git settings
-      become_user: "{{ target_user }}"
-      community.general.git_config:
-        name: "{{ item.name }}"
-        value: "{{ item.value }}"
-        scope: global
-      loop:
-        - { name: user.name,         value: "{{ git_user_name }}" }
-        - { name: user.email,        value: "{{ git_user_email }}" }
-        - { name: credential.helper, value: "cache" }
-        - { name: fetch.prune,       value: "true" }
-        - { name: fetch.pruneTags,   value: "true" }
-        - { name: pull.rebase,       value: "true" }
-        - { name: alias.sync,        value: "!git fetch --all --prune && git trim --no-confirm" }
+    # Git global config — shared with the Mac kit via tasks/common_git.yml.
+    - name: Include common_git tasks
+      ansible.builtin.include_tasks: tasks/common_git.yml
 
     # ---- post-kit health checks ----
     # Run as target_user. Both scripts are read-only by default and report

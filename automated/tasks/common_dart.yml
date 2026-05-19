@@ -1,0 +1,45 @@
+---
+# Dart SDK — needed for Flutter Version Manager (fvm).
+#
+# Mirrors common/install_dart.sh. Linux side uses Google's official apt repo
+# so apt-get upgrade keeps dart current.
+
+- name: Install apt-transport-https (Dart repo prereq)
+  when: ansible_facts['os_family'] == 'Debian'
+  ansible.builtin.apt:
+    name: apt-transport-https
+    state: present
+
+- name: Fetch Google linux signing key (for Dart)
+  when: ansible_facts['os_family'] == 'Debian'
+  ansible.builtin.get_url:
+    url: https://dl-ssl.google.com/linux/linux_signing_key.pub
+    dest: /etc/apt/keyrings/dart.asc
+    mode: "0644"
+    force: false
+
+- name: Dearmor Dart key
+  when: ansible_facts['os_family'] == 'Debian'
+  ansible.builtin.command:
+    cmd: gpg --batch --yes --dearmor -o /etc/apt/keyrings/dart.gpg /etc/apt/keyrings/dart.asc
+    creates: /etc/apt/keyrings/dart.gpg
+
+- name: Add Dart apt repo
+  when: ansible_facts['os_family'] == 'Debian'
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/dart.gpg arch={{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'amd64' }}] https://storage.googleapis.com/download.dartlang.org/linux/debian stable main"
+    filename: dart_stable
+    state: present
+
+- name: Install dart (apt)
+  when: ansible_facts['os_family'] == 'Debian'
+  ansible.builtin.apt:
+    name: dart
+    state: present
+    update_cache: true
+
+- name: Install dart-sdk (brew)
+  when: ansible_facts['os_family'] == 'Darwin'
+  community.general.homebrew:
+    name: dart-sdk
+    state: present

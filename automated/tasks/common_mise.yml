@@ -1,0 +1,50 @@
+---
+# mise — runtime version manager.
+#
+# Mirrors common/install_mise.sh. Linux side adds the mise.jdx.dev apt
+# repo so apt-get upgrade keeps mise current (per ATTACKPLAN feedback:
+# prefer autoupdating install paths).
+#
+# Mac branch is a placeholder for the Phase 6 mac_kitting.yml dispatch —
+# today only ubuntu_kitting.yml include_tasks this file.
+
+- name: Ensure /etc/apt/keyrings exists
+  when: ansible_facts['os_family'] == 'Debian'
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Fetch mise apt signing key
+  when: ansible_facts['os_family'] == 'Debian'
+  ansible.builtin.get_url:
+    url: https://mise.jdx.dev/gpg-key.pub
+    dest: /etc/apt/keyrings/mise-archive-keyring.asc
+    mode: "0644"
+    force: false
+
+- name: Dearmor mise key
+  when: ansible_facts['os_family'] == 'Debian'
+  ansible.builtin.command:
+    cmd: gpg --batch --yes --dearmor -o /etc/apt/keyrings/mise-archive-keyring.gpg /etc/apt/keyrings/mise-archive-keyring.asc
+    creates: /etc/apt/keyrings/mise-archive-keyring.gpg
+
+- name: Add mise apt repo
+  when: ansible_facts['os_family'] == 'Debian'
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch={{ 'arm64' if ansible_facts['architecture'] == 'aarch64' else 'amd64' }}] https://mise.jdx.dev/deb stable main"
+    filename: mise
+    state: present
+
+- name: Install mise (apt)
+  when: ansible_facts['os_family'] == 'Debian'
+  ansible.builtin.apt:
+    name: mise
+    state: present
+    update_cache: true
+
+- name: Install mise (brew)
+  when: ansible_facts['os_family'] == 'Darwin'
+  community.general.homebrew:
+    name: mise
+    state: present

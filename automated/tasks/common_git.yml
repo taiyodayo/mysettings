@@ -1,0 +1,28 @@
+---
+# git global defaults — identical on Mac and Linux.
+# Mirrors common/git_defaults.sh.
+#
+# credential.helper=cache keeps HTTPS creds in memory for 15 min — prefer
+# over `store` so an accidental PAT paste during `git clone https://...`
+# never hits disk. SSH-based auth is unaffected.
+# alias.sync depends on git-trim (cargo-installed elsewhere).
+#
+# Required variables:
+#   target_user
+#   git_user_name
+#   git_user_email
+
+- name: Configure global git settings
+  become_user: "{{ target_user }}"
+  community.general.git_config:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    scope: global
+  loop:
+    - { name: user.name,         value: "{{ git_user_name }}" }
+    - { name: user.email,        value: "{{ git_user_email }}" }
+    - { name: credential.helper, value: "cache" }
+    - { name: fetch.prune,       value: "true" }
+    - { name: fetch.pruneTags,   value: "true" }
+    - { name: pull.rebase,       value: "true" }
+    - { name: alias.sync,        value: "!git fetch --all --prune && git trim --no-confirm" }

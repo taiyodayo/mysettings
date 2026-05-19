@@ -9,12 +9,19 @@ eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shell
 # Ansible variant). awk extracts package names — no yq dep since yq is
 # one of the things we're installing.
 PACKAGES_DIR="$SCRIPT_DIR/packages"
+# Shared common/ scripts (mise, dart, bun, node, fvm, git_defaults).
+MYSETTINGS_DIR="$SCRIPT_DIR"
 awk '/^- / { print $2 }' "$PACKAGES_DIR/darwin_brew_system.yml" \
   | xargs brew install
 awk '/^- / { print $2 }' \
     "$PACKAGES_DIR/darwin_brew_casks.yml" \
     "$PACKAGES_DIR/darwin_brew_fonts.yml" \
   | xargs brew install --cask --force
+
+# bun — shared with the Ubuntu kit (brew on Mac, curl|bash on Ubuntu).
+# cli_tools/llms_update.sh uses `bun add -g` for codex/gemini, so bun
+# must land before that runs.
+bash "$MYSETTINGS_DIR/common/install_bun.sh"
 
 # Add GNU utils to .zshrc (macOS only, idempotent)
 if [[ "$OSTYPE" == "darwin"* ]] && ! grep -Fq 'USE_GNU_UTILS' ~/.zshrc 2>/dev/null; then
@@ -58,18 +65,19 @@ brew install ruby cocoapods
 BREW_PREFIX="$(brew --prefix)"
 export PATH="$BREW_PREFIX/opt/ruby/bin:$PATH"
 
-# dartのバージョンが大きく動いた時、 例えば 3.0 -> 4.0 のような場合、fvm 経由でインストールされる Flutter にバンドルされている dart sdk のバージョンが古く、fvm 自体が動かなくなる事がある。
-brew install dart-sdk
-# --- PATH for current session ---
-export PATH="$HOME/.pub-cache/bin:$PATH"                 # dart pub の実行ファイル
+# dart SDK — shared with the Ubuntu kit. Mac uses brew, Ubuntu uses
+# Google's apt repo. fvm 経由でインストールされる Flutter にバンドルされている
+# dart sdk が古くなる事があるので、host の dart は最新を維持する。
+bash "$MYSETTINGS_DIR/common/install_dart.sh"
 
-# --- FVM & Flutter ---
-dart pub global activate fvm                              # FVM を dart pub で導入
-fvm install stable                                        # Flutter stable を取得
-fvm global stable                                         # グローバルに設定
-export PATH="$PATH:$HOME/fvm/default/bin"                 # すぐ使えるように PATH 追加
-# --- Quick sanity ---
-fvm --version                                             # 動作確認
+# fvm + Flutter — shared with the Ubuntu kit.
+export PATH="$HOME/.pub-cache/bin:$PATH"
+bash "$MYSETTINGS_DIR/common/install_fvm_flutter.sh"
+export PATH="$PATH:$HOME/fvm/default/bin"
+
+# Quick sanity (Mac-specific: flutter doctor is more useful here than on
+# headless Linux because Xcode / Android Studio integration is interactive).
+fvm --version
 flutter --version
 flutter doctor
 alias ff='fvm flutter'
@@ -101,19 +109,22 @@ if [ ! -f ~/.zshrc ] || ! grep -Fq 'Android/sdk/platform-tools' ~/.zshrc; then
 	EOM
 fi
 
-# mise - 自動アクティベーション等、nvm や volta より遥かに便利 (Much more convenient than nvm/volta)
-brew install mise
-# Initialize mise for this current session so the next commands work immediately
+# mise — shared with the Ubuntu kit. Mac uses brew; Ubuntu uses the
+# mise.jdx.dev apt repo. Both autoupdate via the host's normal upgrade flow.
+bash "$MYSETTINGS_DIR/common/install_mise.sh"
+# Initialize mise for this current session so the next commands work immediately.
 eval "$(mise activate zsh)"
-# Add mise to ~/.zshrc if not already there
+# Add mise to ~/.zshrc if not already there (chezmoi's dot_zshrc.tmpl handles
+# this long-term; the inline append keeps pre-chezmoi machines working).
 if [ ! -f ~/.zshrc ] || ! grep -Fq 'mise activate zsh' ~/.zshrc; then
   cat >> ~/.zshrc <<-'EOM'
 # mise
 eval "$(mise activate zsh)"
 EOM
 fi
-# Install Node.js LTS and set it as your global default
-mise use --global node@lts
+
+# node@lts via mise — shared with the Ubuntu kit.
+bash "$MYSETTINGS_DIR/common/install_node.sh"
 
 # uv for Python
 brew install uv
@@ -133,6 +144,11 @@ source "$HOME/p313/bin/activate"
 # will lift this to common/ so the same set lands on Linux too).
 awk '/^- / { print $2 }' "$PACKAGES_DIR/lab_python.yml" \
   | xargs uv pip install
+
+# git global defaults — shared with the Ubuntu kit. This is a behaviour
+# change on Mac (previous Mac kit didn't set git defaults explicitly);
+# values match the lab convention used on Ubuntu.
+bash "$MYSETTINGS_DIR/common/git_defaults.sh"
 
 # Add custom CLI tools directory to PATH
 if [ ! -f ~/.zshrc ] || ! grep -Fq 'mysettings/cli_tools' ~/.zshrc; then
