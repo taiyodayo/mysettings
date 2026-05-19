@@ -7,9 +7,11 @@
 # Casks live in darwin_brew_casks.yml; fonts in darwin_brew_fonts.yml.
 # R/tidyverse build deps live in darwin_brew_r_build_deps.yml.
 #
-# Modern CLI tools (bat, eza, fd, rg, git-delta) stay here for now;
-# ATTACKPLAN Phase 4 moves them to ~/.cargo/bin so the host keeps up
-# with upstream feature releases.
+# Phase 4 moved nine CLI tools off brew — bat, eza, fd, rg, git-delta,
+# dust, jless, zellij, qsv now live in ~/.cargo/bin via cargo-binstall
+# (see dotfiles/run_onchange_install-rustup-and-cargo-tools.sh). git-trim
+# was already cargo-only; now its 9 siblings join it for a uniform Mac+
+# Linux modern-CLI surface that tracks upstream releases.
 
 # -- networking + download tools --
 - aria2
@@ -75,22 +77,13 @@
 - watch
 - hexyl
 
-# -- modern CLI (brew names; some differ from apt, e.g. fd vs fd-find) --
-- bat
+# -- modern CLI staying on brew (cargo route covers the fast-moving ones) --
 - btop
 - duf
-- dust
-- eza
-- fd
-- git-delta
 - hyperfine
-- jless
 - jq
 - procs
-- qsv
-- rg
 - sd
 - tealdeer
 - yq
-- zellij
 - zoxide
