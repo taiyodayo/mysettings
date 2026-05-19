@@ -82,10 +82,14 @@
       - r-cran-renv
       - r-cran-languageserver
       - r-cran-httpgd
-    # gs 10 has a PDF mojibake bug for Japanese — pin to the patched 9.55 build.
-    ghostscript_pinned: "9.55.0~dfsg1-0ubuntu5.4"
-
   tasks:
+    # Keep the host on current upstream before any of our own installs run.
+    # Version-sensitive work moves to Docker, not host pins (ATTACKPLAN §3.6).
+    - name: Update apt cache and upgrade installed packages
+      ansible.builtin.apt:
+        update_cache: true
+        upgrade: 'yes'
+
     # ---- base packages, timezone, sysctl ----
 
     - name: Install base apt packages
@@ -620,27 +624,13 @@
             - not (r_apt_install.failed | default(false))
             - (r_check.rc | default(0)) != 0
 
-    # ---- pinned ghostscript + ImageMagick 7 ----
-    # gs 10 has a PDF mojibake bug for Japanese; pin to 9.55 when available.
-    # ghostscript_pinned is the jammy (22.04) build — on noble/oracular/resolute
-    # the candidate moves to 10.x and the exact pin disappears from apt. We try
-    # the pin first; if apt has no matching candidate, fall back to the default
-    # apt candidate and warn that the mojibake fix isn't in effect.
-    # Ubuntu 26.04+ ships ImageMagick 7 in apt, so no IMEI source build needed.
+    # ---- ghostscript + PDF tools + ImageMagick ----
+    # No version pinning — host chases current upstream (ATTACKPLAN §3.6).
+    # Version-sensitive PDF work (e.g. gs 9.55 for the Japanese mojibake fix)
+    # runs in Docker, not on the host. Ubuntu 26.04+ ships ImageMagick 7 in apt,
+    # so no IMEI source build needed.
 
-    - name: Install pinned ghostscript, PDF tools, and ImageMagick
-      ansible.builtin.apt:
-        name:
-          - "ghostscript={{ ghostscript_pinned }}"
-          - qpdf
-          - mupdf
-          - imagemagick
-        state: present
-        allow_downgrade: true
-      register: gs_pinned
-      failed_when: false
-
-    - name: Fall back to unpinned ghostscript when the pin isn't a candidate
+    - name: Install ghostscript, PDF tools, and ImageMagick
       ansible.builtin.apt:
         name:
           - ghostscript
@@ -648,16 +638,6 @@
           - mupdf
           - imagemagick
         state: present
-      when: gs_pinned is failed
-
-    - name: Warn when ghostscript pin unavailable (Japanese PDF mojibake fix not applied)
-      ansible.builtin.debug:
-        msg: |
-          WARNING: ghostscript={{ ghostscript_pinned }} not available on this release.
-          Installed the default apt candidate instead — Japanese PDF mojibake fix is NOT in effect.
-          If you process Japanese PDFs, pin gs 9.55 manually (e.g. download the jammy .deb)
-          or accept gs 10's behavior.
-      when: gs_pinned is failed
 
 
 - name: Ubuntu server kitting — user layer

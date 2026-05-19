@@ -15,6 +15,14 @@ fi
 
 echo "--- mailab ubuntu server kitting script ---"
 
+# Keep the host on current upstream — version-sensitive work runs in Docker,
+# not pinned on the host. (See ATTACKPLAN.md §3 principle 6.) This runs first
+# so the rest of the kit installs against current apt indexes / package
+# versions, not whatever was current when the image was last booted.
+echo "--- apt update + upgrade (chasing current upstream) ---"
+apt-get update
+apt-get upgrade -y
+
 # apt - 全体でよく使うパッケージ
 # pkg-config + libssl-dev are build deps for typical Rust crates
 # (openssl-sys etc.); see rustup section in the userland block below.
@@ -317,9 +325,10 @@ else
 fi
 
 # misc/datatools でよく使うパッケージ
-# ghostscript9 — gs 10 has a PDF mojibake bug for Japanese; pin 9.55.
-# Ubuntu 26.04+ ships ImageMagick 7 in apt; no IMEI source build needed.
-apt-get install -y ghostscript=9.55.0~dfsg1-0ubuntu5.4 qpdf mupdf imagemagick
+# No version pinning — host chases current upstream (ATTACKPLAN.md §3.6).
+# Version-sensitive PDF work (e.g. gs 9.55 for the Japanese mojibake fix)
+# runs in Docker, not on the host. Ubuntu 26.04+ ships ImageMagick 7 in apt.
+apt-get install -y ghostscript qpdf mupdf imagemagick
 
 
 ### ここからユーザランド ###
