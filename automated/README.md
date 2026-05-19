@@ -1,11 +1,11 @@
-# automated/ — declarative Ubuntu kitting
+# automated/ — declarative kitting (cross-platform)
 
-Ansible reimplementation of the Ubuntu shell scripts in this repo. The
+Ansible reimplementation of the shell kit scripts in this repo. The
 original scripts at the repo root are unchanged and remain the bootstrap
 path; this directory is what to use for repeatable / fleet runs.
 
-Mac kitting is intentionally not here — it will live in a separate
-directory later.
+As of Phase 6, this directory drives both Ubuntu and Mac kits via the
+`kitting.yml` dispatcher.
 
 ## Layout
 
@@ -16,13 +16,18 @@ automated/
 ├── requirements.yml
 ├── Makefile
 ├── README.md
+├── kitting.yml              # cross-platform dispatcher (calls one of ↓)
 ├── ubuntu_kitting.yml       # ≡ ubuntu/my_ubuntu_setup.sh
+├── mac_kitting.yml          # ≡ mac/setup_cli_tools.sh + setup_gui_apps.sh + brew_tidyverse.sh
+│                            #   (minus mas/Xcode/AppleScript — those stay in setup_mailab_mac.sh)
 ├── ubuntu_motd.yml          # ≡ ubuntu/ubuntu_motd_clean.sh
 ├── ubuntu_macbook_hw.yml    # ≡ ubuntu/ubuntu_on_macbook.sh
 ├── ubuntu_gui_tools.yml     # ≡ ubuntu/setup_gui_tools.sh
 ├── ubuntu_superclean.yml    # ≡ ubuntu/superclean_ubuntuserver/*
 ├── zsh_and_keys.yml         # ≡ common/setup_zsh_and_keys.sh (Linux)
-└── llms_update.yml          # ≡ cli_tools/llms_update.sh
+├── llms_update.yml          # ≡ cli_tools/llms_update.sh
+├── group_vars/              # all.yml + linux.yml + darwin.yml (loaded via group_by in kitting.yml)
+└── tasks/                   # common_*.yml — shared per-tool tasks (mise/dart/bun/node/fvm/git)
 ```
 
 One self-contained playbook per original script. No roles, no nested
@@ -62,11 +67,13 @@ After bootstrap, open a fresh shell (pipx writes the PATH update to
 The default inventory targets `localhost`, so SSH setup is not required.
 
 ```bash
-make kit                       # full ubuntu kitting (sudo prompted)
-make motd                      # strip motd ads
-make zsh GH=taiyodayo          # zsh + import GitHub ed25519 key
+make kitting                   # cross-platform kitting (auto-detects OS)
+make kit                       # Ubuntu-only kitting (back-compat alias)
+make mac-kit                   # Mac-only kitting
+make motd                      # strip motd ads (Ubuntu)
+make zsh GH=taiyodayo          # zsh + import GitHub ed25519 key (Ubuntu)
 make llms                      # update gemini / claude / codex
-make audit                     # pre-reboot safety audit
+make audit                     # pre-reboot safety audit (Ubuntu)
 ```
 
 `make help` lists every target. Add `EXTRA='--check --diff'` for a dry run:

@@ -1,0 +1,37 @@
+---
+# Cross-platform kitting dispatcher.
+#
+# Imports both OS-specific kitting playbooks; each guards itself with
+# `meta: end_play` when ansible_facts['os_family'] doesn't match. So
+# running this against a Linux host runs only ubuntu_kitting.yml's
+# plays; running against a Mac runs only mac_kitting.yml's plays.
+#
+# Usage:
+#   ansible-playbook -i localhost, --connection=local kitting.yml
+#   make kitting
+#
+# Each sub-playbook is also usable standalone:
+#   ansible-playbook ubuntu_kitting.yml    # Linux-only, fails-soft on Mac
+#   ansible-playbook mac_kitting.yml       # Mac-only, fails-soft on Linux
+#
+# Setting up the dynamic OS groups first lets group_vars/{linux,darwin}.yml
+# auto-apply via the standard inventory machinery — without this, group_vars
+# don't load when the local-controller `-i localhost,` short-form skips
+# inventory file parsing.
+
+- name: Classify hosts by OS family into dynamic groups
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Add host to os_<family> dynamic group
+      ansible.builtin.group_by:
+        # Lowercase so the group name matches group_vars filename convention.
+        # ansible_facts['os_family'] is "Debian" / "Darwin" / etc.
+        key: "{{ 'linux' if ansible_facts['system'] == 'Linux' else (ansible_facts['os_family'] | lower) }}"
+      changed_when: false
+
+- name: Import Linux kitting (no-op on non-Debian hosts)
+  ansible.builtin.import_playbook: ubuntu_kitting.yml
+
+- name: Import Mac kitting (no-op on non-Darwin hosts)
+  ansible.builtin.import_playbook: mac_kitting.yml

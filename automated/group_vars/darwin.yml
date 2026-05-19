@@ -1,0 +1,10 @@
+---
+# Mac-only vars. Loaded when a host belongs to the `darwin` inventory
+# group.
+
+user_home: "/Users/{{ target_user }}"
+
+# Apple Silicon vs Intel: brew lives in different places. mac_kitting.yml
+# resolves the actual prefix dynamically at runtime via `brew --prefix`,
+# but expose a sensible default here for reference / direct vars use.
+brew_prefix: "{{ '/opt/homebrew' if ansible_facts['architecture'] == 'arm64' else '/usr/local' }}"

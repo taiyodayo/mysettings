@@ -10,8 +10,11 @@
 
 - name: Install bun (brew, Mac)
   when: ansible_facts['os_family'] == 'Darwin'
+  # No explicit `become: true` — brew refuses root, and mac_kitting.yml
+  # runs as the invoking user (the target_user) already. become_user is
+  # honored on Ubuntu via the play's become: true default (where this
+  # branch is gated off anyway by the os_family check above).
   become_user: "{{ target_user }}"
-  become: true
   community.general.homebrew:
     name: bun
     state: present

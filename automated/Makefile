@@ -11,19 +11,25 @@ export PATH := $(HOME)/.local/bin:$(PATH)
 EXTRA ?=
 PLAY  = ansible-playbook $(EXTRA)
 
-.PHONY: help bootstrap collections kit motd macbook-hw gui audit purge purge-real postboot zsh llms
+.PHONY: help bootstrap collections kitting kit mac-kit motd macbook-hw gui audit purge purge-real postboot zsh llms
 
 help:
 	@grep -E '^[a-zA-Z0-9_-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*##' '{printf "  %-15s %s\n", $$1, $$2}'
 
-bootstrap: ## Install ansible + Galaxy collections from scratch (re-entrant)
+bootstrap: ## Install ansible + Galaxy collections (cross-platform — brew on Mac, pipx on Linux)
 	bash $(CURDIR)/bootstrap.sh
 
 collections: ## Install ONLY the Galaxy collections (assumes ansible already present)
 	ansible-galaxy collection install -r requirements.yml
 
-kit: ## Full Ubuntu server kitting
+kitting: ## Full kitting — cross-platform (Ubuntu or Mac, auto-detected via os_family)
+	$(PLAY) kitting.yml --ask-become-pass
+
+kit: ## Ubuntu-only kitting (back-compat — `kitting` is the new cross-platform one)
 	$(PLAY) ubuntu_kitting.yml --ask-become-pass
+
+mac-kit: ## Mac-only kitting (brew/defaults/dock/R + common_*.yml + cargo + uv/p313)
+	$(PLAY) mac_kitting.yml
 
 motd: ## Strip Ubuntu MOTD ads
 	$(PLAY) ubuntu_motd.yml --ask-become-pass
