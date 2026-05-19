@@ -9,8 +9,12 @@ if ! command -v brew >/dev/null 2>&1; then
     exit 1
 fi
 
-# brew packages required for R/tidyverse on Mac
-brew install libgit2 libsodium libtiff cmake libxml2 openssl curl harfbuzz fribidi
+# brew packages required for R/tidyverse on Mac. Canonical list in
+# packages/darwin_brew_r_build_deps.yml — edit there, not here.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PACKAGES_DIR="$SCRIPT_DIR/../packages"
+awk '/^- / { print $2 }' "$PACKAGES_DIR/darwin_brew_r_build_deps.yml" \
+  | xargs brew install
 # CRAN distribution
 brew install --cask r
 

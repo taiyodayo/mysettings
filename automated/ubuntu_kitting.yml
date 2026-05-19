@@ -20,51 +20,9 @@
     # evaluates on the controller in the invoker's context, ignoring become.
     target_user: "{{ lookup('env', 'SUDO_USER') | default(lookup('env', 'USER'), true) }}"
     mysettings_repo_dir: "{{ playbook_dir | dirname }}"
-    base_packages:
-      - zsh
-      - avahi-daemon
-      - parallel
-      - wireguard-tools
-      - nkf
-      - iftop
-      - iotop
-      - rclone
-      - lm-sensors
-      - build-essential
-      - pkg-config
-      - libssl-dev
-      # xcb dev headers — jless pulls in clipboard → x11-clipboard → xcb at
-      # compile time and fails to link on headless servers without these.
-      # Same headers cover any future cargo CLI that depends on rust clipboard.
-      - libxcb1-dev
-      - libxcb-render0-dev
-      - libxcb-shape0-dev
-      - libxcb-xfixes0-dev
-      - gpg
-      - software-properties-common
-      - dirmngr
-      # snapd is required by the `Install yq via snap` task below. Ubuntu
-      # Server full images ship it, but minimal images don't — pin it so the
-      # kit playbook is self-sufficient regardless of how ansible got here
-      # (i.e. works even when the user took the `make collections` shortcut
-      # instead of `make bootstrap`).
-      - snapd
-      # Modern CLI tooling — apt-installable on 24.04+.
-      # cargo-only equivalents (du-dust, jless, zellij, qsv) live in the
-      # userland block; yq (mikefarah/yq) goes via snap.
-      - bat
-      - eza
-      - ripgrep
-      - jq
-      - fd-find
-      - zoxide
-      - git-delta
-      - duf
-      - btop
-      - hyperfine
-      - tealdeer
-      - sd
-      - procs
+    # Canonical apt package list — source of truth shared with
+    # ubuntu/my_ubuntu_setup.sh. Add / remove there, not here.
+    base_packages: "{{ lookup('file', mysettings_repo_dir + '/packages/linux_base.yml') | from_yaml }}"
     # R-DS preload. Lands in /usr/lib/R/site-library — every user sees
     # these the moment they type `R`. Personal extras go to ~/R/...
     # via install.packages() as usual (and via bspm if running as root
