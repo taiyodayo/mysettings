@@ -66,12 +66,18 @@ osascript -e 'tell application id "com.google.android.studio" to activate' \
 
 # xcode のインストール完了を待って、起動
 # install_pid は setup_cli_tools.sh の early-MAS ブロックで export される。
-# App Store にサインインしていなかった場合は空文字列 → wait をスキップする。
+# - App Store 未サインイン (Apple Silicon VM 含む) → 空文字列 → wait スキップ
+# - サインイン済みだが mas install が失敗 → wait が non-zero を返す
+#   `if ! wait` でラップして set -e による親スクリプト終了を防ぐ
+#   (Xcode 失敗は致命的ではない — flutter doctor + 完了メッセージまで進める)
 if [ -n "${install_pid:-}" ]; then
     echo "Xcode のインストールを待っています。完了したら、Xcode を起動します"
-    wait "$install_pid"
+    if ! wait "$install_pid"; then
+        echo "WARN: background MAS install exited non-zero — check /tmp/xcode-install.log"
+        echo "  Continuing kit; retry manually later: mas install 497799835 1451685025"
+    fi
 else
-    echo "Xcode の background install はスキップ済み (App Store 未サインイン)"
+    echo "Xcode の background install はスキップ済み (App Store 未サインイン or VM)"
     echo "  → 後で手動: mas install 497799835 1451685025"
 fi
 # ここ、コマンドで処理してしまうと、Xcode の初回起動時のダイアログが出ない
