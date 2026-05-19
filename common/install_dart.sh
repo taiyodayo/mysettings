@@ -30,7 +30,10 @@ case "$(uname -s)" in
         # apt-transport-https is a hard requirement for the Dart repo URL scheme.
         apt-get install -y apt-transport-https
         mkdir -p -m 755 /etc/apt/keyrings
-        wget -qO- https://dl-ssl.google.com/linux/linux_signing_key.pub \
+        # curl (not wget) to match install_mise.sh and keep the standalone
+        # surface of this script minimal. setup_zsh_and_keys.sh installs
+        # curl before either kitting flow gets here.
+        curl -fsSL https://dl-ssl.google.com/linux/linux_signing_key.pub \
             | gpg --batch --yes --dearmor -o /etc/apt/keyrings/dart.gpg
         chmod go+r /etc/apt/keyrings/dart.gpg
         arch=$(dpkg --print-architecture)

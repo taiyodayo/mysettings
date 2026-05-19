@@ -11,10 +11,13 @@ fi
 
 # brew packages required for R/tidyverse on Mac. Canonical list in
 # packages/darwin_brew_r_build_deps.yml — edit there, not here.
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PACKAGES_DIR="$SCRIPT_DIR/../packages"
-awk '/^- / { print $2 }' "$PACKAGES_DIR/darwin_brew_r_build_deps.yml" \
+# Local var (not SCRIPT_DIR) because this file is `source`-d from
+# setup_mailab_mac.sh, and reassigning SCRIPT_DIR there would clobber
+# the outer-script value the caller depends on.
+pkg_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../packages" && pwd)"
+awk '/^- / { print $2 }' "$pkg_dir/darwin_brew_r_build_deps.yml" \
   | xargs brew install
+unset pkg_dir
 # CRAN distribution
 brew install --cask r
 
