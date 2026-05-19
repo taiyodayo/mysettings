@@ -1,0 +1,16 @@
+---
+# node@lts via mise — identical on Mac and Linux.
+# Mirrors common/install_node.sh. Requires mise to be installed already
+# (common_mise.yml runs first).
+#
+# Required variables (set by the including playbook):
+#   target_user
+#   user_home
+
+- name: Set global mise node version to lts
+  become_user: "{{ target_user }}"
+  ansible.builtin.command: mise use --global node@lts
+  register: mise_use
+  changed_when: "'already' not in (mise_use.stderr | default(''))"
+  environment:
+    PATH: "{{ user_home }}/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin"

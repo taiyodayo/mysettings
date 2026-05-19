@@ -1,0 +1,24 @@
+---
+# bun — JavaScript runtime + package manager.
+#
+# Mirrors common/install_bun.sh. Mac uses brew; Linux uses bun.sh's
+# curl-pipe-bash installer (no apt repo upstream).
+#
+# Required variables (set by the including playbook):
+#   target_user  — invoking user (NOT root)
+#   user_home    — home directory of target_user
+
+- name: Install bun (brew, Mac)
+  when: ansible_facts['os_family'] == 'Darwin'
+  become_user: "{{ target_user }}"
+  become: true
+  community.general.homebrew:
+    name: bun
+    state: present
+
+- name: Install bun (curl|bash, Linux)
+  when: ansible_facts['os_family'] == 'Debian'
+  become_user: "{{ target_user }}"
+  ansible.builtin.shell: curl -fsSL https://bun.sh/install | bash
+  args:
+    creates: "{{ user_home }}/.bun/bin/bun"

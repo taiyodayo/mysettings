@@ -1,0 +1,50 @@
+---
+# fvm (Flutter Version Manager) + Flutter stable — identical recipe on
+# Mac and Linux. Mirrors common/install_fvm_flutter.sh.
+#
+# Requires dart on PATH (common_dart.yml runs first).
+#
+# Tolerant: fvm is only needed for Flutter work. `fvm install stable`
+# downloads ~500MB and frequently hits network blips. The whole block
+# is non-blocking — kit completes without Flutter on slow/flaky links.
+#
+# Required variables:
+#   target_user
+#   user_home
+
+- name: Activate fvm via dart pub global
+  become_user: "{{ target_user }}"
+  ansible.builtin.command: dart pub global activate fvm
+  args:
+    creates: "{{ user_home }}/.pub-cache/bin/fvm"
+  environment:
+    PATH: "/usr/lib/dart/bin:/opt/homebrew/bin:{{ user_home }}/.pub-cache/bin:/usr/bin:/bin"
+  register: fvm_activate
+  ignore_errors: true
+
+- name: Install Flutter stable via fvm
+  become_user: "{{ target_user }}"
+  ansible.builtin.command: fvm install stable
+  args:
+    creates: "{{ user_home }}/fvm/versions/stable"
+  environment:
+    PATH: "{{ user_home }}/.pub-cache/bin:/usr/lib/dart/bin:/opt/homebrew/bin:/usr/bin:/bin"
+  when: not (fvm_activate.failed | default(false))
+  register: fvm_install
+  ignore_errors: true
+
+- name: Set Flutter stable as fvm global default
+  become_user: "{{ target_user }}"
+  ansible.builtin.command: fvm global stable
+  args:
+    creates: "{{ user_home }}/fvm/default"
+  environment:
+    PATH: "{{ user_home }}/.pub-cache/bin:/usr/lib/dart/bin:/opt/homebrew/bin:/usr/bin:/bin"
+  when: not (fvm_install.failed | default(false))
+  register: fvm_global
+  ignore_errors: true
+
+- name: Warn if fvm install failed
+  ansible.builtin.debug:
+    msg: "WARNING: fvm/Flutter install failed — continuing. Re-run kit or `fvm install stable && fvm global stable` later."
+  when: (fvm_activate.failed | default(false)) or (fvm_install.failed | default(false)) or (fvm_global.failed | default(false))

@@ -15,6 +15,10 @@ fi
 
 echo "--- mailab ubuntu server kitting script ---"
 
+# Resolve the repo root once so all the common/ + packages/ helpers below
+# can use a stable absolute path regardless of how the script was invoked.
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+
 # Keep the host on current upstream — version-sensitive work runs in Docker,
 # not pinned on the host. (See ATTACKPLAN.md §3 principle 6.) This runs first
 # so the rest of the kit installs against current apt indexes / package
@@ -30,8 +34,7 @@ apt-get upgrade -y
 # `awk '/^- / { print $2 }'` extracts the package name from each YAML
 # array entry. No yq dependency — yq itself is one of the things the kit
 # installs, so we can't depend on it during bootstrap.
-PACKAGES_DIR="$(dirname "$(readlink -f "$0")")/../packages"
-awk '/^- / { print $2 }' "$PACKAGES_DIR/linux_base.yml" \
+awk '/^- / { print $2 }' "$SCRIPT_DIR/packages/linux_base.yml" \
   | xargs -r apt-get install -y
 
 # Debian/Ubuntu ship bat as /usr/bin/batcat and fd as /usr/bin/fdfind (renames
@@ -65,15 +68,10 @@ fi
 # what you actually want for Rust development work.
 apt-get purge -y rustc cargo 2>/dev/null || true
 
-# mise (公式 apt リポジトリ - brew より apt が推奨)
-apt-get install -y gpg
-mkdir -p /etc/apt/keyrings
-# --batch --yes so re-runs overwrite the existing keyring without prompting
-curl -fsSL https://mise.jdx.dev/gpg-key.pub \
-  | gpg --batch --yes --dearmor -o /etc/apt/keyrings/mise-archive-keyring.gpg
-echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=amd64] https://mise.jdx.dev/deb stable main" \
-  > /etc/apt/sources.list.d/mise.list
-apt-get update && apt-get install -y mise
+# mise — install via the shared common script. Ubuntu uses the official
+# mise.jdx.dev apt repo (so apt-get upgrade keeps it current); Mac uses
+# brew. Per ATTACKPLAN feedback: prefer autoupdating install paths.
+bash "$SCRIPT_DIR/common/install_mise.sh"
 
 # gh (GitHub CLI) — 公式 apt リポジトリ。Ubuntu 同梱の gh は古いので、
 # 公式リポを優先させて常に最新を取得する。
@@ -89,18 +87,10 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubc
   > /etc/apt/sources.list.d/github-cli.list
 apt-get update && apt-get install -y gh
 
-# Dart SDK — Google's official apt repo. Needed for Flutter Version Manager
-# (FVM) via `dart pub global activate fvm` in the userland section below.
-# Replaces linuxbrew's dart-sdk + fvm on Linux.
-# 詳細: https://dart.dev/get-dart
-apt-get install -y apt-transport-https
-mkdir -p -m 755 /etc/apt/keyrings
-wget -qO- https://dl-ssl.google.com/linux/linux_signing_key.pub \
-    | gpg --batch --yes --dearmor -o /etc/apt/keyrings/dart.gpg
-chmod go+r /etc/apt/keyrings/dart.gpg
-echo "deb [signed-by=/etc/apt/keyrings/dart.gpg arch=$(dpkg --print-architecture)] https://storage.googleapis.com/download.dartlang.org/linux/debian stable main" \
-    > /etc/apt/sources.list.d/dart_stable.list
-apt-get update && apt-get install -y dart
+# Dart SDK — install via the shared common script. Ubuntu uses Google's
+# official apt repo (autoupdates via apt-get upgrade); Mac uses brew.
+# fvm sits on top of this in the userland block below.
+bash "$SCRIPT_DIR/common/install_dart.sh"
 
 # タイムゾーンを東京に設定
 timedatectl set-timezone Asia/Tokyo
@@ -337,6 +327,10 @@ apt-get install -y ghostscript qpdf mupdf imagemagick
 sudo -u "$SUDO_USER" zsh << 'EOF'
 echo "Running as $SUDO_USER"
 
+# Repo path inside the user heredoc — relies on the project convention that
+# the repo lives at ~/mysettings (enforced by setup_mailab_ubuntu-ansible.sh).
+MYSETTINGS_DIR="$HOME/mysettings"
+
 # Homebrew on Linux is DEPRECATED.
 #
 # Why: apt + curl-pipe-sh covers everything we need (gh, mise, bat, eza,
@@ -363,7 +357,10 @@ if [ -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
     echo ""
 fi
 
-# node / mise (apt で root セクションにてインストール済み)
+# mise activate hook in ~/.zshrc (mise binary installed by the root block
+# above via common/install_mise.sh). chezmoi's dot_zshrc.tmpl already
+# handles this for chezmoi-managed shells; the inline append below keeps
+# pre-chezmoi machines working.
 eval "$(mise activate zsh)"
 if [ ! -f ~/.zshrc ] || ! grep -Fq 'mise activate zsh' ~/.zshrc; then
   cat >> ~/.zshrc <<-'EOM'
@@ -371,19 +368,18 @@ if [ ! -f ~/.zshrc ] || ! grep -Fq 'mise activate zsh' ~/.zshrc; then
 eval "$(mise activate zsh)"
 EOM
 fi
-mise use --global node@lts
+
+# node@lts via mise — shared with the Mac kit.
+bash "$MYSETTINGS_DIR/common/install_node.sh"
 
 # uv for Python (公式インストーラー - self-update 対応)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 # installer adds ~/.local/bin to PATH via shell profile; activate for this session
 export PATH="$HOME/.local/bin:$PATH"
 
-# bun — JavaScript runtime + package manager. cli_tools/llms_update.sh uses
-# `bun add -g` for codex and gemini, so bun must be on PATH before that runs.
-# bun's installer is idempotent: detects existing install, upgrades in place.
-if ! command -v bun >/dev/null 2>&1; then
-    curl -fsSL https://bun.sh/install | bash
-fi
+# bun — shared with the Mac kit. cli_tools/llms_update.sh uses `bun add -g`
+# for codex/gemini, so bun must be on PATH before that runs.
+bash "$MYSETTINGS_DIR/common/install_bun.sh"
 # Activate for this session (installer adds ~/.bun/bin to .zshrc, but not
 # the current shell). dot_zshrc.tmpl picks it up via `[ -d "$HOME/.bun" ]`.
 [ -d "$HOME/.bun" ] && export PATH="$HOME/.bun/bin:$PATH"
@@ -422,37 +418,15 @@ cargo install --locked jless
 cargo install --locked zellij
 cargo install --locked qsv --features apply
 
-# fvm — Flutter Version Manager, installed via `dart pub global activate`.
-# Replaces linuxbrew fvm. Dart SDK comes from Google's apt repo (root section
-# above). fvm puts its binary at ~/.pub-cache/bin/fvm — dot_zshrc.tmpl picks
-# it up via `[[ -d "$HOME/.pub-cache/bin" ]] && export PATH=...`.
+# fvm + Flutter — shared with the Mac kit. Skip if dart didn't install
+# (root-block install_dart.sh would have failed; common script gates on
+# command -v dart). dot_zshrc.tmpl picks up ~/.pub-cache/bin long-term.
 if command -v dart >/dev/null 2>&1; then
-    export PATH="$HOME/.pub-cache/bin:$PATH"
-    dart pub global activate fvm
-    # Install Flutter stable + set as fvm's global default, but only if not
-    # already done — `fvm install stable` downloads ~500MB.
-    if [ ! -d "$HOME/fvm/versions/stable" ]; then
-        fvm install stable
-    fi
-    fvm global stable
+    bash "$MYSETTINGS_DIR/common/install_fvm_flutter.sh"
 fi
 
-# git のデフォルト
-git config --global user.name "taiyo@$(hostname) default"
-git config --global user.email "taiyodayo@gmail.com"
-# Cache HTTPS creds in memory for 15 min (default). Prefer this over
-# `store` so an accidental PAT paste during `git clone https://...`
-# never hits disk. SSH-based auth (git@github.com:...) doesn't touch
-# credential.helper at all and is unaffected.
-git config --global credential.helper cache
-# Auto-prune remote-deleted branch refs / tags on every fetch.
-git config --global fetch.prune true
-git config --global fetch.pruneTags true
-# `git pull` = rebase, not merge — keeps history linear.
-git config --global pull.rebase true
-# `git sync` = fetch + prune remote-deleted refs + drop local branches whose
-# upstream is gone. Depends on git-trim (installed via cargo above).
-git config --global alias.sync '!git fetch --all --prune && git trim --no-confirm'
+# git global defaults — shared with the Mac kit.
+bash "$MYSETTINGS_DIR/common/git_defaults.sh"
 
 # netdata
 # wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && \
