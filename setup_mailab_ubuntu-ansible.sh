@@ -119,6 +119,16 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# apt update + upgrade — keep the host on current upstream before any of our
+# own installs run. Version-sensitive work moves to Docker, not host pins.
+# (See ATTACKPLAN.md §3 principle 6.)
+# ---------------------------------------------------------------------------
+echo
+echo "=== apt update + upgrade (chasing current upstream) ==="
+sudo apt-get update
+sudo apt-get upgrade -y
+
+# ---------------------------------------------------------------------------
 # Step 1: bootstrap ansible (pipx + Galaxy collections + apt prereqs)
 # ---------------------------------------------------------------------------
 echo
