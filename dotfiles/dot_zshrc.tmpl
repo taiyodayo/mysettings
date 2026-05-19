@@ -111,6 +111,12 @@ fi
 [[ -d "$HOME/fvm/default/bin" ]]  && export PATH="$PATH:$HOME/fvm/default/bin"
 command -v fvm >/dev/null 2>&1    && alias ff='fvm flutter'
 
+# uv-managed Python 3.13 venv (~/p313/) — cross-platform as of Phase 5.
+# Was previously Mac-only; common/install_uv_and_p313.sh now creates it
+# on Ubuntu lab servers too. The `-f` guard keeps this a no-op on hosts
+# that haven't been kitted yet.
+[[ -f "$HOME/p313/bin/activate" ]] && source "$HOME/p313/bin/activate"
+
 {{ if eq .chezmoi.os "darwin" -}}
 # === Mac-only ===
 
@@ -143,9 +149,6 @@ export ANDROID_SDK_ROOT="$HOME/Library/Android/sdk"
     export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
 [[ -d "$ANDROID_SDK_ROOT/platform-tools" ]] && \
     export PATH="$ANDROID_SDK_ROOT/platform-tools:$PATH"
-
-# uv-managed Python 3.13 venv (~/p313/)
-[[ -f "$HOME/p313/bin/activate" ]] && source "$HOME/p313/bin/activate"
 {{ end -}}
 
 # mysettings custom CLI tools — replaces the imperative append in both kitting scripts.

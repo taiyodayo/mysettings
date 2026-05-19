@@ -14,7 +14,7 @@ and-egg problem for the kit itself).
 | `darwin_brew_casks.yml` | `mac/setup_cli_tools.sh` | brew (cask) | GUI apps |
 | `darwin_brew_fonts.yml` | `mac/setup_cli_tools.sh` | brew (cask) | Fonts |
 | `darwin_brew_r_build_deps.yml` | `mac/brew_tidyverse.sh` | brew (formula) | Headers for R/tidyverse source compile |
-| `lab_python.yml` | `mac/setup_cli_tools.sh` (Phase 5: also common) | uv pip | DS preload for `~/p313` |
+| `lab_python.yml` | `common/install_uv_and_p313.sh` | uv pip | DS preload for `~/p313` (cross-platform) |
 
 ## Format
 

@@ -572,7 +572,7 @@
           the warning + recommended action.
       when: linuxbrew_stat.stat.exists
 
-    - name: Activate mise + add cli_tools / ~/.local/bin to PATH in ~/.zshrc
+    - name: Activate mise + p313 + add cli_tools / ~/.local/bin to PATH in ~/.zshrc
       become_user: "{{ target_user }}"
       ansible.builtin.blockinfile:
         path: "{{ user_home }}/.zshrc"
@@ -583,16 +583,35 @@
           eval "$(mise activate zsh)"
           export PATH="$HOME/mysettings/cli_tools:$PATH"
           export PATH="$HOME/.local/bin:$PATH"
+          [ -f "$HOME/p313/bin/activate" ] && source "$HOME/p313/bin/activate"
 
     # node@lts via mise — shared with the Mac kit via tasks/common_node.yml.
     - name: Include common_node tasks
       ansible.builtin.include_tasks: tasks/common_node.yml
 
-    - name: Install uv (astral.sh) for target user
+    # uv + ~/p313 venv + lab DS preload — shared with the Mac kit via
+    # common/install_uv_and_p313.sh. The script delegates uv install to
+    # dotfiles/run_onchange_install-uv.sh (astral.sh's curl installer on
+    # Linux), then creates the cpython-3.13 venv at ~/p313 and preloads
+    # polars/pandas/numpy/etc. per packages/lab_python.yml.
+    - name: Install uv + p313 venv + lab DS preload
       become_user: "{{ target_user }}"
-      ansible.builtin.shell: curl -LsSf https://astral.sh/uv/install.sh | sh
-      args:
-        creates: "{{ user_home }}/.local/bin/uv"
+      ansible.builtin.command: bash {{ mysettings_repo_dir }}/common/install_uv_and_p313.sh
+      environment:
+        # ~/.local/bin first so an existing uv install is found before the
+        # curl installer fires; common-script does an explicit re-export
+        # but Ansible's command module doesn't inherit it from there.
+        PATH: "{{ user_home }}/.local/bin:{{ user_home }}/.cargo/bin:/usr/local/bin:/usr/bin:/bin"
+      register: uv_p313
+      changed_when: "'Installed' in (uv_p313.stdout | default('')) or 'Creating virtual environment' in (uv_p313.stdout | default(''))"
+      # Tolerant: a transient PyPI hiccup on `uv pip install` shouldn't
+      # sink the rest of the kit — the operator can re-run later.
+      ignore_errors: true
+
+    - name: Warn if uv + p313 install reported failures
+      ansible.builtin.debug:
+        msg: "WARNING: uv/p313 script exited non-zero — check tail of {{ uv_p313.stdout_lines | default([]) | join(' / ') }} and re-run kit or `bash common/install_uv_and_p313.sh` later."
+      when: uv_p313.failed | default(false)
 
     # bun — shared with the Mac kit via tasks/common_bun.yml. cli_tools/llms_update.sh
     # uses `bun add -g` for codex/gemini, so bun must be on PATH before that.

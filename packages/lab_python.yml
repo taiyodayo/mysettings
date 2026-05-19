@@ -6,9 +6,10 @@
 # expect it.
 #
 # Read by:
-#   - mac/setup_cli_tools.sh  (today, via `uv pip install $(awk ...)`)
-#   - ATTACKPLAN Phase 5 will lift this to common/install_uv_and_p313.sh
-#     so the same set lands on Ubuntu lab servers too.
+#   - common/install_uv_and_p313.sh  (bash → awk → xargs uv pip install)
+#     — invoked by both the Mac kit (mac/setup_cli_tools.sh) and the
+#     Ubuntu kits (ubuntu/my_ubuntu_setup.sh + automated/ubuntu_kitting.yml)
+#     so the lab DS preload is identical on every kitted box.
 
 - polars
 - pandas
