@@ -72,7 +72,7 @@ make kit                       # Ubuntu-only kitting (back-compat alias)
 make mac-kit                   # Mac-only kitting
 make motd                      # strip motd ads (Ubuntu)
 make zsh GH=taiyodayo          # zsh + import GitHub ed25519 key (Ubuntu)
-make llms                      # update gemini / claude / codex
+make llms                      # update claude / codex
 make audit                     # pre-reboot safety audit (Ubuntu)
 ```
 

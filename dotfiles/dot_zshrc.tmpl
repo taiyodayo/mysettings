@@ -91,9 +91,8 @@ command -v mise >/dev/null 2>&1 && eval "$(mise activate zsh)"
 [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
 
 # bun — JavaScript runtime + package manager used by cli_tools/llms_update.sh
-# (codex, gemini are installed via `bun add -g`). bun's installer writes
-# this block to ~/.zshrc by default; we own it here so chezmoi apply
-# doesn't strip it.
+# (codex is installed via `bun add -g`). bun's installer writes this block
+# to ~/.zshrc by default; we own it here so chezmoi apply doesn't strip it.
 if [ -d "$HOME/.bun" ]; then
     export BUN_INSTALL="$HOME/.bun"
     export PATH="$BUN_INSTALL/bin:$PATH"

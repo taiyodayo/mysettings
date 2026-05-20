@@ -55,5 +55,5 @@ postboot: ## Post-boot smoke test (docker hello-world)
 zsh: ## zsh + (optional) GitHub key import. Pass GH=<github_user>
 	$(PLAY) zsh_and_keys.yml --ask-become-pass $(if $(GH),-e github_username=$(GH))
 
-llms: ## Update gemini / claude / codex CLIs
+llms: ## Update claude / codex CLIs
 	$(PLAY) llms_update.yml
