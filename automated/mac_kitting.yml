@@ -340,7 +340,7 @@
 
     # ---- Post-kit health checks ----
 
-    - name: Run login_check.sh (auth status for gh / claude / codex / gemini)
+    - name: Run login_check.sh (auth status for gh / claude / codex)
       ansible.builtin.command: "{{ mysettings_repo_dir }}/cli_tools/login_check.sh"
       register: login_check
       changed_when: false

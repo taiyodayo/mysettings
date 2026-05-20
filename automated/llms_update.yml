@@ -2,7 +2,7 @@
 # Replaces cli_tools/llms_update.sh. Run periodically to keep the
 # Anthropic / Google / OpenAI CLIs current. Re-runs are safe.
 
-- name: Update LLM CLIs (gemini, claude, codex)
+- name: Update LLM CLIs (claude, codex)
   hosts: all
   gather_facts: true
 
@@ -14,13 +14,12 @@
     target_user: "{{ lookup('env', 'SUDO_USER') | default(lookup('env', 'USER'), true) }}"
     user_home: "/home/{{ target_user }}"
     bun_tools:
-      - { name: gemini, package: "@google/gemini-cli" }
       - { name: codex,  package: "@openai/codex" }
     claude_pkg: "@anthropic-ai/claude-code"
     claude_installer_url: https://claude.ai/install.sh
 
   tasks:
-    # ---- bun-managed tools (gemini, codex) ----
+    # ---- bun-managed tools (codex) ----
 
     - name: Install/update bun-managed CLIs
       ansible.builtin.command: bun add -g {{ item.package }}

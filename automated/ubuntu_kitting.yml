@@ -678,7 +678,7 @@
       when: uv_p313.failed | default(false)
 
     # bun — shared with the Mac kit via tasks/common_bun.yml. cli_tools/llms_update.sh
-    # uses `bun add -g` for codex/gemini, so bun must be on PATH before that.
+    # uses `bun add -g` for codex, so bun must be on PATH before that.
     - name: Include common_bun tasks
       ansible.builtin.include_tasks: tasks/common_bun.yml
 
@@ -719,7 +719,7 @@
     # status only — never fail the playbook. Final stdout shows up in the
     # play recap so the operator sees auth/tool-canonicalness right away.
 
-    - name: Run login_check.sh (gh / claude / codex / gemini auth status)
+    - name: Run login_check.sh (gh / claude / codex auth status)
       become_user: "{{ target_user }}"
       ansible.builtin.command: "{{ user_home }}/mysettings/cli_tools/login_check.sh"
       register: login_check

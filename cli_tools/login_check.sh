@@ -2,8 +2,8 @@
 # Consolidated login check for LLM and dev CLIs. For each tool that's
 # installed on this machine, report whether you're logged in. For tools
 # with a clean non-interactive login flow (gh, codex), offer to launch
-# the login command. For tools with a TUI-style login (claude, gemini),
-# just print the command to run yourself.
+# the login command. For tools with a TUI-style login (claude), just
+# print the command to run yourself.
 #
 # Re-runnable anytime. Logged-in tools no-op.
 #
@@ -95,20 +95,6 @@ if command -v codex >/dev/null 2>&1; then
     fi
 else
     skip "codex: not installed"
-fi
-
-# --- gemini (Google Gemini CLI) -------------------------------------------
-# Heuristic: ~/.gemini/oauth_creds.json present after Google OAuth login.
-# First-run prompts are TUI-style — print the command rather than auto-launch.
-if command -v gemini >/dev/null 2>&1; then
-    if [ -s "$HOME/.gemini/oauth_creds.json" ]; then
-        ok "gemini: credentials present (~/.gemini/oauth_creds.json)"
-    else
-        nope "gemini: no credentials at ~/.gemini/oauth_creds.json"
-        tell "To log in: run \`gemini\` and follow the interactive prompts."
-    fi
-else
-    skip "gemini: not installed"
 fi
 
 echo "${B}=== Done. ===${X}"

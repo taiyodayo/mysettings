@@ -61,8 +61,8 @@ awk '/^- / { print $2 }' \
   | xargs brew install --cask --force
 
 # bun — shared with the Ubuntu kit (brew on Mac, curl|bash on Ubuntu).
-# cli_tools/llms_update.sh uses `bun add -g` for codex/gemini, so bun
-# must land before that runs.
+# cli_tools/llms_update.sh uses `bun add -g` for codex, so bun must
+# land before that runs.
 bash "$MYSETTINGS_DIR/common/install_bun.sh"
 
 # Add GNU utils to .zshrc (macOS only, idempotent)
@@ -201,7 +201,7 @@ if [ ! -f ~/.zshrc ] || ! grep -Fq 'mysettings/cli_tools' ~/.zshrc; then
 fi
 export PATH="$HOME/mysettings/cli_tools:$PATH"
 
-# Consolidated login check (gh, claude, codex, gemini) — reports auth status.
+# Consolidated login check (gh, claude, codex) — reports auth status.
 if [ -x "$SCRIPT_DIR/cli_tools/login_check.sh" ]; then
     "$SCRIPT_DIR/cli_tools/login_check.sh"
 fi

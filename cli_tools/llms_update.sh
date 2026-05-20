@@ -177,8 +177,8 @@ update_claude_native() {
 
 # Function to handle the version check and update logic
 update_tool() {
-    local CMD_NAME=$1       # The command you type (e.g., gemini)
-    local PACKAGE_NAME=$2   # The npm/bun package name (e.g., @google/gemini-cli)
+    local CMD_NAME=$1       # The command you type (e.g., codex)
+    local PACKAGE_NAME=$2   # The npm/bun package name (e.g., @openai/codex)
 
     echo -n "Processing $CMD_NAME... "
 
@@ -208,11 +208,8 @@ update_tool() {
 
 # --- RUN UPDATES ---
 
-# 1. Google Gemini
-update_tool "gemini" "@google/gemini-cli"
-
-# 2. Claude Code (native installer)
+# 1. Claude Code (native installer)
 update_claude_native
 
-# 3. Codex
+# 2. Codex
 update_tool "codex" "@openai/codex"

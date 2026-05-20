@@ -107,7 +107,7 @@ Symbol legend:
 | **fvm**                    | `dart pub global activate fvm` | same               | `dart pub global activate fvm`                    | ✅      |
 | **Flutter stable**         | `fvm install stable && fvm global stable` | same   | same                                              | ✅      |
 | **claude (native)**        | `cli_tools/llms_update.sh` (curl claude.ai/install.sh) | same | unchanged                                        | ✅      |
-| **gemini, codex**          | `bun add -g` via llms_update.sh | same              | unchanged                                         | ✅      |
+| **codex**                  | `bun add -g` via llms_update.sh | same              | unchanged                                         | ✅      |
 | **git defaults** (user.name/email, pull.rebase, fetch.prune…, alias.sync) | inline append | community.general.git_config | shared bash function in `common/git_defaults.sh` | 🔀 |
 | **cli_tools/ on PATH**     | imperative append     | imperative append           | chezmoi `dot_zshrc.tmpl` (already does this)      | ✅      |
 | **login_check.sh / check_tools.sh runs** | yes | yes        | same — invoked from common end-of-kit             | ✅      |

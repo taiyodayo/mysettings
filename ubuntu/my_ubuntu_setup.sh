@@ -377,7 +377,7 @@ if [ ! -f ~/.zshrc ] || ! grep -Fq 'p313/bin/activate' ~/.zshrc; then
 fi
 
 # bun — shared with the Mac kit. cli_tools/llms_update.sh uses `bun add -g`
-# for codex/gemini, so bun must be on PATH before that runs.
+# for codex, so bun must be on PATH before that runs.
 bash "$MYSETTINGS_DIR/common/install_bun.sh"
 # Activate for this session (installer adds ~/.bun/bin to .zshrc, but not
 # the current shell). dot_zshrc.tmpl picks it up via `[ -d "$HOME/.bun" ]`.
@@ -418,7 +418,7 @@ if [ ! -f ~/.zshrc ] || ! grep -Fq 'mysettings/cli_tools' ~/.zshrc; then
 fi
 export PATH="$HOME/mysettings/cli_tools:$PATH"
 
-# Consolidated login check (gh, claude, codex, gemini). stdin is a here-doc
+# Consolidated login check (gh, claude, codex). stdin is a here-doc
 # here, so login_check.sh runs in non-interactive mode — it reports status
 # and prints the commands to run, without blocking the kitting flow. Run
 # `login_check.sh` from an interactive shell afterward to actually log in.
