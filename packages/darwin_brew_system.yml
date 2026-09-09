@@ -24,7 +24,6 @@
 - automake
 - awscli
 - cocoapods
-- direnv
 - dockutil
 - gh
 - git

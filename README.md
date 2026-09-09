@@ -21,7 +21,7 @@ mysettings/
 ├── setup_mailab_mac.sh        ← Mac エントリーポイント
 ├── setup_mailab_ubuntu.sh     ← Ubuntu エントリーポイント
 ├── migrate_to_chezmoi.sh      ← 既存マシンを chezmoi 管理に移行 (opt-in)
-├── _zshrc, _p10k.zsh          ← レガシー — chezmoi 移行完了後に削除予定
+├── _zshrc, _p10k.zsh          ← レガシー配布用 (dotfiles/dot_zshrc.tmpl と同一内容を保つこと) — chezmoi 移行完了後に削除予定
 ├── common/                    ← Mac / Linux 両方で使うスクリプト
 │   └── setup_zsh_and_keys.sh
 ├── mac/                       ← Mac 専用サブスクリプト

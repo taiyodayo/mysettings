@@ -6,7 +6,7 @@ This directory is the [chezmoi](https://chezmoi.io) source for files that land i
 
 | Source file (here)                                       | Deploys to / runs as                       | Notes |
 |----------------------------------------------------------|--------------------------------------------|-------|
-| `dot_zshrc.tmpl`                                         | `~/.zshrc`                                 | absorbs all 8 imperative kitting-script appends as runtime conditionals. Cross-platform Flutter/bun blocks plus Mac-only block for GNU coreutils, dart pub, Android SDK, p313 venv |
+| `dot_zshrc.tmpl`                                         | `~/.zshrc`                                 | **byte-identical to `../_zshrc`** (no Go template directives; runtime `[[ -d ]]` guards handle Mac vs Ubuntu). Edit one, `cp` to the other. p10k instant prompt, 100k shared history, `typeset -U path`, once-a-day `compinit` (else `-C`), zinit turbo plugins, deferred `compdef` scripts via `late_completions`, mise activated last |
 | `dot_p10k.zsh`                                           | `~/.p10k.zsh`                              | verbatim copy of `_p10k.zsh` (no template needed) |
 | `modify_dot_gitconfig.tmpl`                              | `~/.gitconfig`                             | **surgical** — uses `git config -f` to set canonical keys only, preserves everything else (e.g. `gh auth setup-git`'s per-host credential helpers stay intact) |
 | `dot_zprofile.tmpl`                                      | `~/.zprofile`                              | brew shellenv on Mac (and tolerates existing linuxbrew on Linux during deprecation) |
@@ -36,6 +36,32 @@ To capture changes that an installer (or you) made directly to `~/.zshrc`:
 chezmoi add ~/.zshrc        # pulls current ~/.zshrc back into dotfiles/dot_zshrc
 git diff dotfiles/          # review what got captured before committing
 ```
+
+## Keeping `_zshrc` and `dot_zshrc.tmpl` in sync
+
+Pre-chezmoi machines still get `~/.zshrc` from `_zshrc` (`common/setup_zsh_and_keys.sh`, `automated/zsh_and_keys.yml`). Both files are intentionally identical so there is one behaviour to reason about:
+
+```bash
+cp _zshrc dotfiles/dot_zshrc.tmpl     # after editing _zshrc, or the other way round
+diff _zshrc dotfiles/dot_zshrc.tmpl   # must print nothing before you commit
+```
+
+Do not add `{{ }}` template directives to `dot_zshrc.tmpl`; use runtime checks (`$OSTYPE`, `[[ -d ... ]]`) so the same text works as plain `_zshrc`.
+
+### Layout of `~/.zshrc` (2026-09 rewrite)
+
+1. **p10k instant prompt** — must be the first thing; nothing may print before it.
+2. **History/options** — 100k lines, `share_history`, `hist_ignore_dups`, `typeset -U path fpath` (no PATH duplicates however often blocks re-run).
+3. **PATH** — every entry guarded by `[[ -d ]]`; later prepend wins. Kitting scripts grep for these guard strings and skip their own appends when present: `USE_GNU_UTILS`, `## BEGIN FVM/Ruby PATH`, `Android/sdk/platform-tools`, `mysettings/cli_tools`, `p313/bin/activate`, `mise activate zsh`.
+4. **zinit + p10k** — `POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD` is set *before* the theme loads (it was set after, i.e. ignored).
+5. **Completions** — extra `fpath` dirs (brew, `~/.local/share/zsh/site-functions`, Docker Desktop), then `compinit` runs inside the turbo block: full audit + dump rebuild if `~/.zcompdump` is older than 24 h, otherwise `compinit -C`. Scripts that call `compdef` themselves (gcloud, dart/fvm) go in the `late_completions` array and are sourced right after compinit, then `zicdreplay`. Machine-local ones: `late_completions+=(/path/_foo.zsh)` in `~/.zlocal`.
+6. **Tool hooks** — `~/p313` venv only. direnv was retired 2026-09: per-directory env/PATH/venv now come from each repo's `mise.toml` (`[env]`, `_.path`, `python.uv_venv_auto`, `[hooks] enter`).
+7. **Aliases/functions** — `ls` colour picks GNU vs BSD via `$USE_GNU_UTILS`, `ff`, `pip`→`uv pip`, `uvinit` (`uv init --bare` + `uv sync`; mise activates the project's `.venv` on cd via `settings.python.uv_venv_auto = "source"` in `~/.config/mise/config.toml`, which only fires when `uv.lock` exists, so python + uv should be mise-managed and no default venv lives in `~`). Lab docker vars (`docker_host`, `local_uid`, `local_gid`, `MAI_DEBUG`) use zsh builtins `$HOST/$UID/$GID`, so no subprocesses at startup.
+8. **`~/.zlocal`, `~/.zshrc.local`**, then **`mise activate zsh` last** so its shims win.
+
+Startup on an M3 Mac went from ~600 ms to ~100 ms (most of it was an unconditional full `compinit`).
+
+Git global defaults are no longer set from `~/.zshrc` on every shell start; `common/git_defaults.sh` / `modify_dot_gitconfig.tmpl` own that.
 
 ## Where to put machine-specific or installer-added content
 

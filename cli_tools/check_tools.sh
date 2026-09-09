@@ -17,7 +17,7 @@
 #   1 — strong consolidation: claude, rustc/cargo, bat, eza, gh, mise, node, uv
 #                             (auto-fixable in user-owned dirs)
 #   2 — warn-only:            ruby, fvm/flutter mixing
-#   3 — no enforcement:       chezmoi (apt or curl both OK), direnv, bun
+#   3 — no enforcement:       chezmoi (apt or curl both OK), bun
 
 set -uo pipefail
 

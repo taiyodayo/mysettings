@@ -1,35 +1,121 @@
+# ~/.zshrc — managed in ~/mysettings.
+#   Source of truth: dotfiles/dot_zshrc.tmpl (chezmoi) and _zshrc (legacy copy
+#   deployed by common/setup_zsh_and_keys.sh + automated/zsh_and_keys.yml).
+#   The two files are byte-identical; edit one, copy to the other.
+#   Runtime `[[ -d ... ]]` guards make one file work on Mac and Ubuntu.
+#
+# Per-machine additions do NOT go here:
+#   ~/.zlocal        host-specific env, aliases, secrets loaders (sourced near the end)
+#   ~/.zshrc.local   installer-added blocks you want to keep across re-kits (sourced last)
+#
+# Order matters: instant prompt → options → PATH → zinit/p10k → completions →
+# tool hooks → aliases → ~/.zlocal → mise last (tools, per-dir [env], venv activation).
+
+# ---------------------------------------------------------------------------
+# powerlevel10k instant prompt. Must stay at the very top; nothing that reads
+# stdin or prints may run before it.
+# ---------------------------------------------------------------------------
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+    source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+
+# ---------------------------------------------------------------------------
+# History + shell options
+# ---------------------------------------------------------------------------
 HISTFILE=~/.zsh_history
-SAVEHIST=1000
-HISTSIZE=1000
-setopt appendhistory
-# zsh のオススメ設定
-setopt interactivecomments  # ハッシュをコメントとして無視する (bashのように)
-setopt extended_glob        # 拡張グロブを有効にする
-setopt glob_dots            # 隠しファイルをグロブに含める (bashのように)
-setopt no_beep              # うるさいビープ音を止める
+HISTSIZE=100000
+SAVEHIST=100000
+setopt append_history inc_append_history share_history extended_history
+setopt hist_ignore_dups hist_ignore_space hist_reduce_blanks hist_verify
+setopt interactivecomments  # `#` starts a comment on the command line (like bash)
+setopt extended_glob        # ^ ~ # glob operators
+setopt glob_dots            # globs match dotfiles (like bash)
+setopt no_beep
 
-# ~/.local/bin holds the native Claude Code binary (uv, other user-installed tools)
-export PATH="$HOME/.local/bin:$PATH"
+# path/fpath are arrays tied to PATH/FPATH; -U keeps them duplicate-free so the
+# prepends below can be repeated safely (re-source, nested shells, tmux, ...).
+typeset -U path fpath manpath
 
-# Initialize brew in current session. Apple Silicon (/opt/homebrew) and Intel
-# Mac (/usr/local) are the canonical paths — Mac brew is our chosen package
-# manager. /home/linuxbrew is included for TRANSITION COMPATIBILITY only:
-# linuxbrew is deprecated on Linux (apt + curl-pipe-sh cover everything) but
-# we don't auto-remove existing installs. Run `cli_tools/check_tools.sh` to
-# see the uninstall command if you still have linuxbrew on a Linux box.
-for brew_path in /opt/homebrew/bin/brew /usr/local/bin/brew /home/linuxbrew/.linuxbrew/bin/brew; do
-    if [[ -x "$brew_path" ]]; then
-        eval "$($brew_path shellenv)"
+export LANG=en_US.UTF-8     # ja_JP.UTF-8 breaks remote tools when iTerm2 forwards locale
+
+# ---------------------------------------------------------------------------
+# PATH. Order of these blocks = final precedence (later prepend wins).
+# Every entry is guarded so the same file works on Mac / Ubuntu / a bare VM.
+# ---------------------------------------------------------------------------
+
+# Homebrew (Apple Silicon, Intel, and legacy linuxbrew for transition only).
+for _brew in /opt/homebrew/bin/brew /usr/local/bin/brew /home/linuxbrew/.linuxbrew/bin/brew; do
+    if [[ -x $_brew ]]; then
+        eval "$($_brew shellenv)"
         break
     fi
 done
+unset _brew
+export HOMEBREW_AUTO_UPDATE_SECS=86400
 
-# Initialize direnv if available
-if command -v direnv >/dev/null 2>&1; then
-    eval "$(direnv hook zsh)"
+# GNU coreutils/findutils/grep/sed/tar/getopt without the g- prefix (Mac only).
+# USE_GNU_UTILS is also the guard string mac/setup_cli_tools.sh greps for.
+if [[ $OSTYPE == darwin* && -n $HOMEBREW_PREFIX ]]; then
+    for _gnu in coreutils findutils grep gnu-sed gnu-tar; do
+        [[ -d $HOMEBREW_PREFIX/opt/$_gnu/libexec/gnubin ]] && path=("$HOMEBREW_PREFIX/opt/$_gnu/libexec/gnubin" $path)
+    done
+    [[ -d $HOMEBREW_PREFIX/opt/gnu-getopt/bin ]] && path=("$HOMEBREW_PREFIX/opt/gnu-getopt/bin" $path)
+    [[ -d $HOMEBREW_PREFIX/opt/coreutils ]] && export USE_GNU_UTILS="true"
+    unset _gnu
 fi
 
-### Added by Zinit's installer
+# Rust (rustup writes ~/.cargo/env; it prepends ~/.cargo/bin).
+[[ -f $HOME/.cargo/env ]] && source "$HOME/.cargo/env"
+
+# Google Cloud SDK (path only here; completion is registered further down).
+[[ -f $HOME/google-cloud-sdk/path.zsh.inc ]] && source "$HOME/google-cloud-sdk/path.zsh.inc"
+
+# Android SDK (Mac; installed via Android Studio SDK Manager).
+# 'Android/sdk/platform-tools' is the guard string mac/setup_cli_tools.sh greps for.
+if [[ -d $HOME/Library/Android/sdk ]]; then
+    export ANDROID_SDK_ROOT="$HOME/Library/Android/sdk"
+    [[ -d $ANDROID_SDK_ROOT/platform-tools ]]           && path=("$ANDROID_SDK_ROOT/platform-tools" $path)
+    [[ -d $ANDROID_SDK_ROOT/cmdline-tools/latest/bin ]] && path=("$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" $path)
+fi
+
+## BEGIN FVM/Ruby PATH
+# (heading kept verbatim: it is the guard string mac/setup_cli_tools.sh greps for)
+# Homebrew Ruby (Mac: cocoapods/xcodeproj). mise may also manage ruby; mise
+# shims are added last below and therefore win when a project pins a version.
+[[ -n $HOMEBREW_PREFIX && -d $HOMEBREW_PREFIX/opt/ruby/bin ]] && path=("$HOMEBREW_PREFIX/opt/ruby/bin" $path)
+# Dart/Flutter: `dart pub global activate` binaries, manual Flutter, FVM default.
+[[ -d $HOME/.pub-cache/bin ]]  && path=("$HOME/.pub-cache/bin" $path)
+[[ -d $HOME/flutter/bin ]]     && path=("$HOME/flutter/bin" $path)
+[[ -d $HOME/fvm/default/bin ]] && path=("$HOME/fvm/default/bin" $path)
+## END FVM/Ruby PATH
+
+# bun (JS runtime; cli_tools/llms_update.sh installs codex/claude with `bun add -g`).
+if [[ -d $HOME/.bun ]]; then
+    export BUN_INSTALL="$HOME/.bun"
+    path=("$BUN_INSTALL/bin" $path)
+fi
+
+# pnpm global bin (Mac: ~/Library/pnpm, Linux: ~/.local/share/pnpm).
+for _pnpm in "$HOME/Library/pnpm" "$HOME/.local/share/pnpm"; do
+    if [[ -d $_pnpm ]]; then
+        export PNPM_HOME="$_pnpm"
+        path=("$PNPM_HOME" $path)
+        break
+    fi
+done
+unset _pnpm
+
+# mysettings custom CLI tools ('mysettings/cli_tools' is a kitting guard string).
+[[ -d $HOME/mysettings/cli_tools ]] && path=("$HOME/mysettings/cli_tools" $path)
+# mailab-internal command tools (appended: lowest precedence).
+[[ -d $HOME/mailab-internal/misc/mailab_cmd_tools ]] && path+=("$HOME/mailab-internal/misc/mailab_cmd_tools")
+
+# ~/.local/bin: native Claude Code, uv, pipx, and other user-installed tools.
+path=("$HOME/.local/bin" $path)
+
+# ---------------------------------------------------------------------------
+# zinit + plugins + powerlevel10k
+# ---------------------------------------------------------------------------
 if [[ ! -f $HOME/.zinit/bin/zinit.zsh ]]; then
     print -P "%F{33}▓▒░ %F{220}Installing %F{33}DHARMA%F{220} Initiative Plugin Manager (%F{33}zdharma/zinit%F{220})…%f"
     command mkdir -p "$HOME/.zinit" && command chmod g-rwX "$HOME/.zinit"
@@ -37,133 +123,121 @@ if [[ ! -f $HOME/.zinit/bin/zinit.zsh ]]; then
         print -P "%F{33}▓▒░ %F{34}Installation successful.%f%b" || \
         print -P "%F{160}▓▒░ The clone has failed.%f%b"
 fi
-if [[ ! -f "$HOME/.zinit/bin/zinit.zsh" ]]; then
+if [[ ! -f $HOME/.zinit/bin/zinit.zsh ]]; then
     print -P "%F{160}▓▒░ FATAL: Zinit not found after install attempt. Check git/network.%f%b"
     return 1
 fi
 source "$HOME/.zinit/bin/zinit.zsh"
 autoload -Uz _zinit
 (( ${+_comps} )) && _comps[zinit]=_zinit
-# Load a few important annexes, without Turbo
-# (this is currently required for annexes)
+# Annexes must load without turbo.
 zinit light-mode for \
     zdharma-continuum/z-a-rust \
     zdharma-continuum/z-a-as-monitor \
     zdharma-continuum/z-a-patch-dl \
     zdharma-continuum/z-a-bin-gem-node
-### End of Zinit's installer chunk
-# Two regular plugins loaded without tracking.
-zinit light zsh-users/zsh-autosuggestions
-zinit light zdharma-continuum/fast-syntax-highlighting
-zinit ice depth=1; zinit light romkatv/powerlevel10k
 
-# To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
-[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+# Prompt. The wizard flag must be set BEFORE the theme loads to have any effect.
 POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true
+zinit ice depth=1
+zinit light romkatv/powerlevel10k
+[[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh   # `p10k configure` to regenerate
 
-# シェル上で日本語化けるの対策。 # sshでlinuxリモートで化ける時は、iterm2 から locale variable を送信しないように変更
-# export LANG=ja_JP.UTF-8
-# Easier to handle ssh etc
-export LANG=en_US.UTF-8
+# Extra completion directories. Must be on fpath before compinit runs.
+[[ -n $HOMEBREW_PREFIX && -d $HOMEBREW_PREFIX/share/zsh/site-functions ]] && fpath=("$HOMEBREW_PREFIX/share/zsh/site-functions" $fpath)
+[[ -d $HOME/.local/share/zsh/site-functions ]] && fpath=("$HOME/.local/share/zsh/site-functions" $fpath)   # sentry-cli, gh copilot
+[[ -d $HOME/.docker/completions ]]             && fpath=("$HOME/.docker/completions" $fpath)               # Docker Desktop
+
+# compinit: full security audit + dump rebuild at most once a day; otherwise
+# `compinit -C` reuses ~/.zcompdump. This was ~230 ms of every shell start.
+_zcd=${ZDOTDIR:-$HOME}/.zcompdump
+if [[ -n $_zcd(#qN.mh+24) ]]; then
+    ZINIT[COMPINIT_OPTS]=""      # stale: run the full thing and refresh the dump
+    command rm -f -- "$_zcd" "$_zcd.zwc"
+else
+    ZINIT[COMPINIT_OPTS]="-C"
+fi
+unset _zcd
+
+# Completion scripts that call `compdef`/`complete` themselves (gcloud, dart/fvm,
+# cf, ...). Sourced before compinit they either run their own compinit (gcloud)
+# or silently do nothing (fvm), so they are deferred until right after compinit
+# in the turbo block below. ~/.zlocal can append machine-local ones:
+#     late_completions+=(~/.config/cf/completions/_cf.zsh)
+typeset -ga late_completions
+[[ -f $HOME/google-cloud-sdk/completion.zsh.inc ]] && late_completions+=("$HOME/google-cloud-sdk/completion.zsh.inc")
+[[ -f $HOME/.dart-cli-completion/zsh-config.zsh ]] && late_completions+=("$HOME/.dart-cli-completion/zsh-config.zsh")
+_source_late_completions() {
+    local f
+    for f in "${late_completions[@]}"; do
+        [[ -f $f ]] && source "$f"
+    done
+}
+
+# Turbo mode: plugins load right after the first prompt is drawn.
+# Syntax highlighting's atinit runs compinit, sources the late completion
+# scripts, then replays every compdef zinit queued. Autosuggestions must load
+# after highlighting (wait"0b" > wait"0a").
+zinit wait"0a" lucid light-mode for \
+    atinit"zicompinit; _source_late_completions; zicdreplay" \
+        zdharma-continuum/fast-syntax-highlighting
+zinit wait"0b" lucid light-mode for \
+    atload"_zsh_autosuggest_start" \
+        zsh-users/zsh-autosuggestions
+
+# ---------------------------------------------------------------------------
+# Tool hooks
+# ---------------------------------------------------------------------------
+# Lab default Python venv (~/p313, created by common/install_uv_and_p313.sh).
+# Guard string 'p313/bin/activate' is what the kitting scripts grep for.
+[[ -f $HOME/p313/bin/activate ]] && source "$HOME/p313/bin/activate"
+
+# ---------------------------------------------------------------------------
+# Aliases / functions
+# ---------------------------------------------------------------------------
+# ls colour: GNU ls (Linux, or Mac with coreutils on PATH) vs BSD ls.
+if [[ $OSTYPE == darwin* && -z $USE_GNU_UTILS ]]; then
+    alias ls='ls -G'
+else
+    alias ls='ls --color=auto'
+fi
+command -v fvm >/dev/null 2>&1 && alias ff='fvm flutter'
+command -v uv  >/dev/null 2>&1 && alias pip='uv pip'
+
+# Python = mise (python + uv in ~/.config/mise/config.toml) with
+# `settings.python.uv_venv_auto = "source"`: when you cd into a directory that
+# has uv.lock + .venv, mise puts that venv first on PATH; leaving it restores
+# mise's python. Per-directory env vars/PATH live in a repo's mise.toml [env]
+# (direnv was retired 2026-09; mise covers tools + env + venv in one place).
+# uvinit [py-version]: turn the current directory into a uv project
+# (pyproject.toml + uv.lock + .venv). Add deps with `uv add`, never `pip install`.
+uvinit() {
+    [[ -f pyproject.toml ]] || uv init --bare --python "${1:-3.13}" || return 1
+    uv sync || return 1
+    cd . && echo "uv project ready in $PWD — .venv is active (mise re-activates it on every cd)."
+}
+
+# mai研究室 docker-compose expects these (mailab-internal/docker/*). Uses zsh
+# builtins ($HOST/$UID/$GID) so no subprocesses at startup.
+export docker_host="$HOST" local_uid="$UID" local_gid="$GID" MAI_DEBUG="rstudio_gui"
 
 # coatools @taiyodayo
-if [ -f ~/.mailab/coatools/coatools.sh ]; then
-    source ~/.mailab/coatools/coatools.sh
-fi
+[[ -f ~/.mailab/coatools/coatools.sh ]] && source ~/.mailab/coatools/coatools.sh
 
-# mai研究室用スクリプト
-export docker_host=$(hostname)
-export local_uid=$(id -u)
-export local_gid=$(id -g)
-export MAI_DEBUG="rstudio_gui"
-
-## Colorize the ls output (GNU ls vs BSD ls)
-{{ if eq .chezmoi.os "darwin" -}}
-alias ls='ls -G'
-{{ else -}}
-alias ls='ls --color=auto'
-{{ end -}}
-
-# mise — was previously appended imperatively by Mac + Ubuntu kitting scripts.
-command -v mise >/dev/null 2>&1 && eval "$(mise activate zsh)"
-
-# Rust toolchain (rustup writes ~/.cargo/env; sourcing it puts ~/.cargo/bin first on PATH)
-[[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
-
-# bun — JavaScript runtime + package manager used by cli_tools/llms_update.sh
-# (codex is installed via `bun add -g`). bun's installer writes this block
-# to ~/.zshrc by default; we own it here so chezmoi apply doesn't strip it.
-if [ -d "$HOME/.bun" ]; then
-    export BUN_INSTALL="$HOME/.bun"
-    export PATH="$BUN_INSTALL/bin:$PATH"
-    [ -s "$BUN_INSTALL/_bun" ] && source "$BUN_INSTALL/_bun"
-fi
-
-# Dart pub global activate destination + Flutter / FVM — cross-platform.
-# ~/.pub-cache/bin is where `dart pub global activate <pkg>` drops binaries
-# (fvm, melos, etc.). ~/flutter/bin is the typical manual-install path.
-# ~/fvm/default/bin is FVM's switchable-version symlink (set up by
-# `fvm global stable`). `ff` is shorthand for `fvm flutter`, only aliased
-# if fvm is actually on PATH.
-[[ -d "$HOME/.pub-cache/bin" ]]   && export PATH="$HOME/.pub-cache/bin:$PATH"
-[[ -d "$HOME/flutter/bin" ]]      && export PATH="$HOME/flutter/bin:$PATH"
-[[ -d "$HOME/fvm/default/bin" ]]  && export PATH="$PATH:$HOME/fvm/default/bin"
-command -v fvm >/dev/null 2>&1    && alias ff='fvm flutter'
-
-# uv-managed Python 3.13 venv (~/p313/) — cross-platform as of Phase 5.
-# Was previously Mac-only; common/install_uv_and_p313.sh now creates it
-# on Ubuntu lab servers too. The `-f` guard keeps this a no-op on hosts
-# that haven't been kitted yet.
-[[ -f "$HOME/p313/bin/activate" ]] && source "$HOME/p313/bin/activate"
-
-{{ if eq .chezmoi.os "darwin" -}}
-# === Mac-only ===
-
-# GNU coreutils first on PATH (replaces the imperative append in mac/setup_cli_tools.sh).
-# brew_prefix is /opt/homebrew on Apple Silicon, /usr/local on Intel — try both.
-for _brew_prefix in /opt/homebrew /usr/local; do
-    for _gnu in coreutils findutils grep gnu-sed gnu-tar; do
-        _gnubin="$_brew_prefix/opt/$_gnu/libexec/gnubin"
-        [[ -d "$_gnubin" ]] && PATH="$_gnubin:$PATH"
-    done
-    _gnugetopt="$_brew_prefix/opt/gnu-getopt/bin"
-    [[ -d "$_gnugetopt" ]] && PATH="$_gnugetopt:$PATH"
-done
-unset _brew_prefix _gnu _gnubin _gnugetopt
-if [[ -d /opt/homebrew/opt/coreutils ]] || [[ -d /usr/local/opt/coreutils ]]; then
-    export USE_GNU_UTILS="true"
-fi
-
-# Homebrew Ruby — Mac dev workflow only (cocoapods + xcodeproj depend on it).
-# (Cross-platform Flutter/FVM/.pub-cache handling is above, outside this block.)
-if command -v brew >/dev/null 2>&1; then
-    _ruby_prefix="$(brew --prefix)/opt/ruby/bin"
-    [[ -d "$_ruby_prefix" ]] && export PATH="$_ruby_prefix:$PATH"
-    unset _ruby_prefix
-fi
-
-# Android SDK (install from Android Studio SDK Manager separately)
-export ANDROID_SDK_ROOT="$HOME/Library/Android/sdk"
-[[ -d "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" ]] && \
-    export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
-[[ -d "$ANDROID_SDK_ROOT/platform-tools" ]] && \
-    export PATH="$ANDROID_SDK_ROOT/platform-tools:$PATH"
-{{ end -}}
-
-# mysettings custom CLI tools — replaces the imperative append in both kitting scripts.
-[[ -d "$HOME/mysettings/cli_tools" ]] && export PATH="$HOME/mysettings/cli_tools:$PATH"
-
-# マシン別の設定ファイルをソース
-[[ -f ~/.zlocal ]] && source ~/.zlocal
-
-# Installer additions that should survive `chezmoi apply` go here (NOT in ~/.zshrc).
-# See dotfiles/README.md for the convention.
-[[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
-
-# "tmux not working with git when ssh -A" issue. Only modify SSH_AUTH_SOCK when inside tmux
-if [ -n "$TMUX" ] && [ -S "$SSH_AUTH_SOCK" ]; then
-    # Only create/use symlink for tmux sessions
+# ssh -A + tmux: keep SSH_AUTH_SOCK valid across re-attaches.
+if [[ -n $TMUX && -S $SSH_AUTH_SOCK ]]; then
     mkdir -p ~/.ssh
     ln -sf "$SSH_AUTH_SOCK" ~/.ssh/ssh_auth_sock
     export SSH_AUTH_SOCK=~/.ssh/ssh_auth_sock
 fi
+
+# ---------------------------------------------------------------------------
+# Per-machine config (not managed by the repo)
+# ---------------------------------------------------------------------------
+[[ -f ~/.zlocal ]]      && source ~/.zlocal
+[[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
+
+# mise: tool versions, per-directory [env] / _.path, uv venv activation, hooks.
+# Kept LAST so its paths sit in front of everything above and project pins win.
+# 'mise activate zsh' is the guard string the kitting scripts grep for.
+command -v mise >/dev/null 2>&1 && eval "$(mise activate zsh)"
