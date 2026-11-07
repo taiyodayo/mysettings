@@ -1,0 +1,233 @@
+---
+# Run on the workstation through ../kit-server USER@HOST.
+# Builtin modules only: the baseline does not need Galaxy collections.
+- name: Bootstrap and apply an Ubuntu server over SSH
+  hosts: servers
+  gather_facts: false
+  become: false
+  any_errors_fatal: true
+  vars:
+    server_repository: https://github.com/taiyodayo/mysettings.git
+    native_build_packages:
+      - git
+      - curl
+      - gpg
+      - ca-certificates
+      - build-essential
+      - pkg-config
+      - libssl-dev
+      - libyaml-dev
+      - libreadline-dev
+      - zlib1g-dev
+      - libffi-dev
+      - libgmp-dev
+      - libbz2-dev
+      - liblzma-dev
+      - libsqlite3-dev
+      - unzip
+      - xz-utils
+  tasks:
+    - name: Validate the explicitly selected revision and account
+      ansible.builtin.assert:
+        that:
+          - target_user is defined
+          - target_user != 'root'
+          - server_revision is defined
+          - server_revision is match('^[0-9a-f]{40}$')
+        fail_msg: Run kit-server with an existing non-root Ubuntu SSH account.
+
+    - name: Probe Ubuntu and the login account without requiring Python
+      ansible.builtin.raw: |
+        set -eu
+        . /etc/os-release
+        test "$ID" = ubuntu || { echo 'Ubuntu required' >&2; exit 1; }
+        dpkg --compare-versions "$VERSION_ID" ge 22.04 || { echo 'Ubuntu 22.04 or later required' >&2; exit 1; }
+        test "$(id -un)" = {{ target_user | quote }}
+        command -v sudo >/dev/null || { echo 'This SSH account requires sudo access' >&2; exit 1; }
+        printf 'Ubuntu %s; login %s; Python: ' "$VERSION_ID" "$(id -un)"
+        if test -x /usr/bin/python3; then /usr/bin/python3 --version; else echo missing; fi
+      changed_when: false
+      check_mode: false
+      register: server_probe
+
+    - name: Verify sudo access without requiring Python or changing configuration
+      become: true
+      ansible.builtin.raw: 'test "$(id -u)" = 0'
+      changed_when: false
+      check_mode: false
+
+    - name: Show remote preflight and planned scope
+      ansible.builtin.debug:
+        msg:
+          - "{{ server_probe.stdout_lines }}"
+          - "Deploy {{ server_revision }} to the SSH user's ~/mysettings; install native prerequisites and locked server tools."
+          - "Check mode stops here: it cannot simulate a Python-less host or runtime downloads. No changes have been made."
+      when: ansible_check_mode
+
+    - name: End read-only preflight before bootstrapping or importing the lab kit
+      ansible.builtin.meta: end_host
+      when: ansible_check_mode
+
+    - name: Bootstrap Python only when missing
+      become: true
+      ansible.builtin.raw: |
+        set -eu
+        if ! test -x /usr/bin/python3; then
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-apt
+          echo MYSETTINGS_PYTHON_INSTALLED
+        fi
+      register: python_bootstrap
+      changed_when: "'MYSETTINGS_PYTHON_INSTALLED' in python_bootstrap.stdout"
+
+    - name: Gather facts as the SSH user, not root
+      ansible.builtin.setup:
+
+    - name: Resolve remote paths independently of the controller checkout
+      ansible.builtin.set_fact:
+        remote_user_home: "{{ ansible_facts['user_dir'] }}"
+        mysettings_remote_dir: "{{ ansible_facts['user_dir'] }}/mysettings"
+        remote_shell_rc: "{{ ansible_facts['user_dir'] }}/{{ '.zshrc' if ansible_facts['user_shell'] is search('/zsh$') else '.bashrc' }}"
+
+    - name: Require a supported interactive login shell
+      ansible.builtin.assert:
+        that: ansible_facts['user_shell'] is search('/(bash|zsh)$')
+        fail_msg: This kit activates mise for bash/zsh only; configure the account's shell first.
+
+    - name: Install native build and repository prerequisites
+      become: true
+      ansible.builtin.apt:
+        name: "{{ native_build_packages }}"
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+        lock_timeout: 300
+
+    - name: Inspect the remote checkout
+      ansible.builtin.stat:
+        path: "{{ mysettings_remote_dir }}/.git"
+      register: remote_git
+
+    - name: Clone the selected committed state on first setup
+      ansible.builtin.git:
+        repo: "{{ server_repository }}"
+        dest: "{{ mysettings_remote_dir }}"
+        version: "{{ server_revision }}"
+        force: false
+      when: not remote_git.stat.exists
+
+    - name: Inspect whether the checkout is detached (including interrupted first setup)
+      ansible.builtin.command:
+        argv: [git, symbolic-ref, --quiet, --short, HEAD]
+        chdir: "{{ mysettings_remote_dir }}"
+      register: remote_branch
+      changed_when: false
+      failed_when: remote_branch.rc not in [0, 1]
+
+    - name: Keep a tracking branch so machine sync works after first setup
+      ansible.builtin.command:
+        argv: [git, switch, -c, machine-state]
+        chdir: "{{ mysettings_remote_dir }}"
+      when: remote_branch.rc == 1
+      register: created_branch
+
+    - name: Set the new branch upstream without moving its selected commit
+      ansible.builtin.command:
+        argv: [git, branch, --set-upstream-to=origin/main, machine-state]
+        chdir: "{{ mysettings_remote_dir }}"
+      when: created_branch is changed
+
+    - name: Require a clean existing checkout before updating
+      ansible.builtin.command:
+        argv: [git, status, --porcelain, --untracked-files=normal]
+        chdir: "{{ mysettings_remote_dir }}"
+      changed_when: false
+      register: remote_status
+      failed_when: remote_status.rc != 0 or remote_status.stdout | length > 0
+
+    - name: Fetch approved repository history without resetting local work
+      ansible.builtin.command:
+        argv: [git, fetch, origin]
+        chdir: "{{ mysettings_remote_dir }}"
+      changed_when: false
+
+    - name: Reject a rewind or divergent remote history
+      ansible.builtin.command:
+        argv: [git, merge-base, --is-ancestor, HEAD, "{{ server_revision }}"]
+        chdir: "{{ mysettings_remote_dir }}"
+      changed_when: false
+
+    - name: Record the previous checkout revision
+      ansible.builtin.command:
+        argv: [git, rev-parse, HEAD]
+        chdir: "{{ mysettings_remote_dir }}"
+      changed_when: false
+      register: previous_revision
+
+    - name: Fast-forward to the workstation-selected commit
+      ansible.builtin.command:
+        argv: [git, merge, --ff-only, "{{ server_revision }}"]
+        chdir: "{{ mysettings_remote_dir }}"
+      changed_when: previous_revision.stdout != server_revision
+
+    - name: Install mise through its existing Ubuntu apt bootstrap
+      become: true
+      ansible.builtin.command:
+        argv: [bash, "{{ mysettings_remote_dir }}/common/install_mise.sh"]
+        creates: /usr/bin/mise
+      environment:
+        PATH: /usr/local/bin:/usr/bin:/bin
+
+    - name: Apply the locked server profile as the SSH user
+      ansible.builtin.command:
+        argv: ["{{ mysettings_remote_dir }}/cli_tools/machine", setup, ubuntu-server]
+      environment:
+        HOME: "{{ remote_user_home }}"
+        PATH: /usr/local/bin:/usr/bin:/bin
+      register: server_tools
+      changed_when: "'installed 0 tools' not in server_tools.stderr or 'Configuration linked' in server_tools.stdout"
+
+    - name: Inspect the existing shell initialization
+      ansible.builtin.stat:
+        path: "{{ remote_shell_rc }}"
+      register: shell_rc
+
+    - name: Read the existing shell initialization
+      ansible.builtin.slurp:
+        src: "{{ remote_shell_rc }}"
+      register: shell_contents
+      when: shell_rc.stat.exists
+      no_log: true
+
+    - name: Add one mise activation block without replacing shell configuration
+      ansible.builtin.blockinfile:
+        path: "{{ remote_shell_rc }}"
+        create: true
+        mode: "0644"
+        backup: true
+        marker: "# {mark} mysettings mise activation"
+        block: |
+          if command -v mise >/dev/null 2>&1; then
+              eval "$(mise activate {{ 'zsh' if ansible_facts['user_shell'] is search('/zsh$') else 'bash' }})"
+          fi
+      when: not ((shell_contents.content | default('') | b64decode) is search('mise\s+activate\s+(bash|zsh)'))
+
+    - name: Verify explicit noninteractive runtime execution
+      ansible.builtin.command:
+        argv:
+          - mise
+          - exec
+          - --
+          - sh
+          - -c
+          - 'ruby --version && bundle --version && node --version && pnpm --version && python --version && uv --version'
+        chdir: "{{ mysettings_remote_dir }}"
+      environment:
+        HOME: "{{ remote_user_home }}"
+        PATH: /usr/local/bin:/usr/bin:/bin
+      changed_when: false
+      register: server_versions
+
+    - name: Show installed server versions
+      ansible.builtin.debug:
+        var: server_versions.stdout_lines

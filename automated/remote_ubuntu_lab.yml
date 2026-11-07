@@ -1,0 +1,8 @@
+---
+# Explicit opt-in: this also installs/starts Docker and monitoring, changes
+# system settings and trust, upgrades apt packages, and installs R/r2u.
+- name: Prepare the remote account and repository
+  ansible.builtin.import_playbook: remote_ubuntu.yml
+
+- name: Apply the broader existing lab kit
+  ansible.builtin.import_playbook: ubuntu_kitting.yml
