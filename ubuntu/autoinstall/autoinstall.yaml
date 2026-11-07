@@ -1,23 +1,126 @@
-# Ubuntu Server 26.04 LTS installation-media template.
-# Replace the public key before copying to USB; never put a private key here.
-# Select Ubuntu Server (minimized) in the interactive source screen.
+# Ubuntu Server 26.04 LTS, booted in UEFI mode.
+# Copy this AND select-disk.py beside casper/ on the installer media.
+# Replace the public key before use. The disk you select will be erased.
 autoinstall:
   version: 1
-  interactive-sections:
-    - source
-    - storage
-    - network
-    - identity
+  interactive-sections: [identity]
+  identity:
+    realname: Taiyo
+    username: taiyo
+    hostname: ""
+    # Locked placeholder, NOT a default password. The interactive screen asks
+    # for a new local/sudo password and replaces this value.
+    password: "!"
+  source:
+    id: ubuntu-server-minimal
+    search_drivers: true
+  refresh-installer:
+    update: true
+  updates: all
+  shutdown: poweroff
+  locale: en_US.UTF-8
+  keyboard:
+    layout: us
+  timezone: Asia/Tokyo
+  drivers:
+    install: true
+  snaps: []
+  early-commands:
+    # The native guided disk screen would regenerate an ext4 layout. Select
+    # only the disk here, then let Subiquity apply the Btrfs/LVM actions below.
+    - >-
+      sh -c 'openvt -s -w -- python3 /cdrom/select-disk.py &&
+      ! grep -q __SELECT_INSTALL_DISK__ /autoinstall.yaml'
+  network:
+    version: 2
+    renderer: networkd
+    ethernets:
+      predictable:
+        match: {name: "en*"}
+        dhcp4: true
+        dhcp6: true
+        accept-ra: true
+        optional: true
+      legacy:
+        match: {name: "eth*"}
+        dhcp4: true
+        dhcp6: true
+        accept-ra: true
+        optional: true
   ssh:
     install-server: true
     allow-pw: false
     authorized-keys:
       - "ssh-ed25519 REPLACE_WITH_YOUR_PUBLIC_KEY"
+  storage:
+    swap:
+      size: 0
+    config:
+      - id: install-disk
+        type: disk
+        path: "__SELECT_INSTALL_DISK__"
+        ptable: gpt
+        wipe: superblock-recursive
+        preserve: false
+        grub_device: false
+      - id: efi
+        type: partition
+        device: install-disk
+        number: 1
+        size: 1G
+        flag: boot
+        grub_device: true
+      - id: efi-fs
+        type: format
+        volume: efi
+        fstype: fat32
+      - id: boot
+        type: partition
+        device: install-disk
+        number: 2
+        size: 2G
+      - id: boot-fs
+        type: format
+        volume: boot
+        fstype: ext4
+      - id: lvm-pv
+        type: partition
+        device: install-disk
+        number: 3
+        size: -1
+        flag: lvm
+      - id: system-vg
+        type: lvm_volgroup
+        name: ubuntu-vg
+        devices: [lvm-pv]
+      - id: root-lv
+        type: lvm_partition
+        name: root
+        volgroup: system-vg
+        size: -1
+      - id: root-fs
+        type: format
+        volume: root-lv
+        fstype: btrfs
+      - {id: root-mount, type: mount, device: root-fs, path: /}
+      - {id: boot-mount, type: mount, device: boot-fs, path: /boot}
+      - {id: efi-mount, type: mount, device: efi-fs, path: /boot/efi}
   packages:
     - avahi-daemon
     - sudo
     - python3
     - python3-apt
     - ca-certificates
+    - btrfs-progs
+    - lvm2
   late-commands:
+    - |
+      cat > /target/etc/ssh/sshd_config.d/00-mysettings-key-only.conf <<'EOF'
+      PubkeyAuthentication yes
+      AuthenticationMethods publickey
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin no
+      EOF
+    - curtin in-target -- /usr/sbin/sshd -t
     - curtin in-target -- systemctl enable avahi-daemon

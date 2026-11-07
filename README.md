@@ -56,4 +56,5 @@ command to apply a newer published commit. [Remote setup and scope](automated/RE
 
 For the preceding USB installation step, use the [Ubuntu Server 26.04 minimal
 autoinstall template](ubuntu/autoinstall/README.md). It installs SSH, your public key,
-Avahi and Ansible prerequisites while keeping disk and account selection interactive.
+Avahi, Ansible prerequisites and third-party drivers. Disk and account selection stay
+interactive; the chosen disk receives a full-size Btrfs root on LVM.
