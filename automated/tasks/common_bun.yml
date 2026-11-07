@@ -1,27 +1,5 @@
 ---
-# bun — JavaScript runtime + package manager.
-#
-# Mirrors common/install_bun.sh. Mac uses brew; Linux uses bun.sh's
-# curl-pipe-bash installer (no apt repo upstream).
-#
-# Required variables (set by the including playbook):
-#   target_user  — invoking user (NOT root)
-#   user_home    — home directory of target_user
-
-- name: Install bun (brew, Mac)
-  when: ansible_facts['os_family'] == 'Darwin'
-  # No explicit `become: true` — brew refuses root, and mac_kitting.yml
-  # runs as the invoking user (the target_user) already. become_user is
-  # honored on Ubuntu via the play's become: true default (where this
-  # branch is gated off anyway by the os_family check above).
-  become_user: "{{ target_user }}"
-  community.general.homebrew:
-    name: bun
-    state: present
-
-- name: Install bun (curl|bash, Linux)
-  when: ansible_facts['os_family'] == 'Debian'
-  become_user: "{{ target_user }}"
-  ansible.builtin.shell: curl -fsSL https://bun.sh/install | bash
-  args:
-    creates: "{{ user_home }}/.bun/bin/bun"
+# Historical include retained to give external playbooks an actionable failure.
+- name: Require the unified machine setup
+  ansible.builtin.fail:
+    msg: "Use cli_tools/machine setup with an explicit machine profile; this installer is retired."

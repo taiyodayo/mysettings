@@ -13,12 +13,7 @@ sudo apt update
 ## Install Android Studio
 sudo apt install android-studio
 
-# fvm / flutter
-brew tap leoafarias/fvm
-brew install fvm
-##
-fvm install stable
-fvm global stable
+# Flutter SDKs are mise-owned; select an explicit workstation profile.
 
 # Google Chrome
 wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmour -o /usr/share/keyrings/google-chrome-keyring.gpg

@@ -109,28 +109,6 @@
         state: present
         install_options: force
 
-    # ---- Ruby + CocoaPods workflow ----
-    # ruby + cocoapods come in via brew_system_packages above. Adding
-    # xcodeproj is the one extra gem the iOS workflow needs.
-
-    - name: Install xcodeproj gem
-      community.general.gem:
-        name: xcodeproj
-        state: present
-        user_install: true
-      environment:
-        PATH: "{{ brew_prefix }}/opt/ruby/bin:/usr/local/bin:/usr/bin:/bin"
-      # Tolerant: rubygems.org occasionally 5xx's; xcodeproj is only needed
-      # for the iOS / CocoaPods workflow and not all Mac kits do that work.
-      # Let the rest of the play complete.
-      register: gem_xcodeproj
-      ignore_errors: true
-
-    - name: Warn if xcodeproj gem install failed
-      ansible.builtin.debug:
-        msg: "WARNING: gem install xcodeproj failed — continuing without it. Re-run kit or `gem install --user-install xcodeproj` later."
-      when: gem_xcodeproj.failed | default(false)
-
     # ---- iTerm2 plist ----
 
     - name: Stat iTerm2 plist source
@@ -268,75 +246,17 @@
       when: not (pacman_install.failed | default(false))
       ignore_errors: true
 
-    # ---- Shared common_*.yml tasks (mise, dart, bun, node, fvm, git) ----
-
-    - name: Include common_mise tasks
+    - name: Install mise through Homebrew
       ansible.builtin.include_tasks: tasks/common_mise.yml
 
-    - name: Include common_dart tasks
-      ansible.builtin.include_tasks: tasks/common_dart.yml
-
-    - name: Include common_bun tasks
-      ansible.builtin.include_tasks: tasks/common_bun.yml
-
-    - name: Include common_node tasks
-      ansible.builtin.include_tasks: tasks/common_node.yml
-
-    - name: Include common_fvm tasks
-      ansible.builtin.include_tasks: tasks/common_fvm.yml
-
-    - name: Include common_git tasks
-      ansible.builtin.include_tasks: tasks/common_git.yml
-
-    # ---- rustup + cargo tools ----
-
-    - name: Install rustup + cargo tools via dotfiles script
-      ansible.builtin.command: bash {{ mysettings_repo_dir }}/dotfiles/run_onchange_install-rustup-and-cargo-tools.sh
+    - name: Apply declared workstation tools
+      ansible.builtin.command:
+        argv: ["{{ mysettings_repo_dir }}/cli_tools/machine", setup, macos-workstation]
       environment:
-        # ~/.cargo/bin first so re-runs find existing rustup; brew_prefix
-        # second so curl / gpg / etc. resolve from brew on PATH.
-        PATH: "{{ user_home }}/.cargo/bin:{{ brew_prefix }}/bin:/usr/local/bin:/usr/bin:/bin"
-      register: cargo_tools
-      changed_when: "'Installing' in (cargo_tools.stdout | default('')) or 'updated' in (cargo_tools.stdout | default(''))"
-      ignore_errors: true
-
-    - name: Warn if cargo tools install reported failures
-      ansible.builtin.debug:
-        msg: "WARNING: cargo tools script exited non-zero — re-run kit or `bash dotfiles/run_onchange_install-rustup-and-cargo-tools.sh` later."
-      when: cargo_tools.failed | default(false)
-
-    # ---- uv + p313 + lab DS preload ----
-
-    - name: Install uv + p313 venv + lab DS preload
-      ansible.builtin.command: bash {{ mysettings_repo_dir }}/common/install_uv_and_p313.sh
-      environment:
-        # brew_prefix first so brew-installed uv wins over any
-        # ~/.local/bin/uv left by a curl installer.
-        PATH: "{{ brew_prefix }}/bin:{{ user_home }}/.local/bin:/usr/local/bin:/usr/bin:/bin"
-      register: uv_p313
-      changed_when: "'Installed' in (uv_p313.stdout | default('')) or 'Creating virtual environment' in (uv_p313.stdout | default(''))"
-      ignore_errors: true
-
-    - name: Warn if uv + p313 install reported failures
-      ansible.builtin.debug:
-        msg: "WARNING: uv/p313 script exited non-zero — re-run kit or `bash common/install_uv_and_p313.sh` later."
-      when: uv_p313.failed | default(false)
-
-    # ---- Imperative ~/.zshrc append for pre-chezmoi machines ----
-    # dot_zshrc.tmpl handles all of these for chezmoi-managed shells;
-    # the blockinfile below covers pre-chezmoi Mac kits. Mirrors the
-    # mise+PATH blockinfile in ubuntu_kitting.yml (user layer).
-
-    - name: Activate mise + p313 + PATH adjustments in ~/.zshrc
-      ansible.builtin.blockinfile:
-        path: "{{ user_home }}/.zshrc"
-        create: true
-        mode: "0644"
-        marker: "# {mark} ANSIBLE MANAGED BLOCK - mise + PATH"
-        block: |
-          eval "$(mise activate zsh)"
-          export PATH="$HOME/mysettings/cli_tools:$PATH"
-          [ -f "$HOME/p313/bin/activate" ] && source "$HOME/p313/bin/activate"
+        HOME: "{{ user_home }}"
+        PATH: "{{ brew_prefix }}/bin:/usr/local/bin:/usr/bin:/bin"
+      register: machine_setup
+      changed_when: "'installed' in machine_setup.stderr or 'Configuration linked' in machine_setup.stdout"
 
     # ---- Post-kit health checks ----
 

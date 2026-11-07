@@ -1,0 +1,29 @@
+# Shared machine defaults. Applications override these in their own mise.toml.
+[tools]
+node = "26"
+pnpm = "12"
+python = ["3.14", "3.13"]
+ruby = "3.4"
+uv = "0.13"
+
+[settings]
+lockfile = true
+lockfile_auto_prune = false
+lockfile_platforms = ["macos-arm64", "macos-x64", "linux-x64", "linux-arm64"]
+idiomatic_version_file_enable_tools = ["ruby", "node", "python", "rust"]
+exec_auto_install = false
+not_found_auto_install = false
+upgrade.auto_prune = false
+node.corepack = false
+python.compile = false
+
+[env]
+UV_PYTHON_DOWNLOADS = "never"
+UV_PYTHON_PREFERENCE = "only-system"
+# pnpm 12: mismatches fail instead of downloading another package manager/runtime.
+pnpm_config_pm_on_fail = "error"
+pnpm_config_runtime = "false"
+pnpm_config_runtime_on_fail = "error"
+# Older project-selected pnpm 9/10/11 equivalents.
+npm_config_manage_package_manager_versions = "false"
+npm_config_package_manager_strict_version = "true"

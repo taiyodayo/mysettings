@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+# Repository-scoped maintenance; compatible with macOS Bash 3.2.
+set -euo pipefail
+repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
+config="$repo/toolchain"
+fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+usage() {
+    echo 'machine select macos-workstation|omarchy-workstation|ubuntu-server'
+    echo 'machine setup [profile] | apply | plan | activate | sync | update-tools'
+    echo 'machine upgrade-versions TOOL@VERSION | lock | native | update-system | doctor | cleanup | lab'
+}
+operation=${1:-help}; shift || true
+case "$operation" in help|-h|--help) usage; exit 0;; esac
+[[ $EUID != 0 ]] || fail 'Run as the target user; native operations use sudo.'
+select_profile() {
+    case "${1:-}" in
+        macos-workstation) [[ $(uname -s) == Darwin ]] || fail 'Requires macOS'; selection='"macos", "workstation"';;
+        omarchy-workstation) [[ -d ${OMARCHY_PATH:-$HOME/.local/share/omarchy} ]] || fail 'Requires Omarchy'; selection='"linux", "omarchy", "workstation"';;
+        ubuntu-server) [[ -f /etc/os-release ]] || fail 'Requires Ubuntu'
+            # shellcheck disable=SC1091
+            ( . /etc/os-release; [[ $ID == ubuntu ]] ) || fail 'Requires Ubuntu'
+            selection='"linux", "ubuntu", "server"';;
+        *) fail 'Choose macos-workstation, omarchy-workstation or ubuntu-server';;
+    esac
+    printf '# Machine-local; do not commit.\nenv = [%s]\n' "$selection" > "$config/miserc.local.toml"
+}
+if [[ $operation == select ]]; then select_profile "${1:-}"; exit 0; fi
+if [[ $operation == setup && $# == 1 ]]; then select_profile "$1"; fi
+[[ -f $config/miserc.local.toml ]] || fail 'Run machine select PROFILE first.'
+if grep -q '"omarchy"' "$config/miserc.local.toml"; then platform=omarchy
+elif grep -q '"ubuntu"' "$config/miserc.local.toml"; then platform=ubuntu
+elif grep -q '"macos"' "$config/miserc.local.toml"; then platform=macos
+else fail 'Unknown machine selector'; fi
+case "$platform:$(uname -s)" in macos:Darwin|omarchy:Linux|ubuntu:Linux) ;; *) fail 'Selector does not match host';; esac
+build_environment() {
+    local legacy
+    for legacy in GEM_HOME GEM_PATH; do
+        [[ -z ${!legacy:-} ]] || fail "$legacy is set; leave the legacy Ruby environment before machine maintenance."
+    done
+    [[ $platform != macos ]] || return 0
+    local name value bad=0
+    for name in PATH CC CXX LD AR CFLAGS CXXFLAGS CPPFLAGS LDFLAGS CPATH LIBRARY_PATH LD_LIBRARY_PATH PKG_CONFIG_PATH PKG_CONFIG_LIBDIR CMAKE_PREFIX_PATH RUBY_CONFIGURE_OPTS RUBY_BUILD_OPTS PYTHON_CONFIGURE_OPTS CONFIGURE_OPTS; do
+        value=${!name:-}
+        case "$value" in *linuxbrew*|*Linuxbrew*|*homebrew*|*Homebrew*) echo "Contaminated build variable: $name" >&2; bad=1;; esac
+    done
+    # ruby-build 20261023 probes brew --prefix even on Linux.
+    if command -v brew >/dev/null 2>&1; then echo 'brew is discoverable on Linux; use a native-only PATH for builds.' >&2; bad=1; fi
+    [[ $bad == 0 ]] || fail 'Remove stale global injections; keep intentional project flags in the project. See docs/mise.md.'
+}
+# Exclude caller project and system configuration, retain data/cache directories.
+for name in $(compgen -e); do
+    case "$name" in MISE_*_VERSION|MISE_ENV|MISE_GLOBAL_CONFIG*|MISE_SYSTEM_CONFIG*|MISE_OVERRIDE_*|MISE_IGNORED_CONFIG_PATHS|MISE_NO_CONFIG) unset "$name";; esac
+done
+export MISE_CONFIG_DIR="$config" MISE_SYSTEM_CONFIG_DIR="$config/.no-system"
+export MISE_CEILING_PATHS="$repo" MISE_AUTO_ENV=false MISE_UPGRADE_AUTO_PRUNE=false
+export MISE_EXEC_AUTO_INSTALL=false MISE_NOT_FOUND_AUTO_INSTALL=false
+cd "$config"
+m() { mise "$@"; }
+
+if [[ $operation == native ]]; then
+    build_environment
+    case $platform in
+        macos)
+            command -v brew >/dev/null || fail 'Install Homebrew and Apple Command Line Tools first.'
+            bash "$repo/common/install_mise.sh"
+            MISE_CONFIG_DIR="$config" MISE_SYSTEM_CONFIG_DIR="$config/.no-system" MISE_CEILING_PATHS="$repo" mise -C "$config" bootstrap packages apply --manager brew --yes;;
+        ubuntu)
+            sudo apt-get update
+            sudo apt-get install -y git curl gpg build-essential pkg-config libssl-dev libyaml-dev libreadline-dev zlib1g-dev libffi-dev libgmp-dev libbz2-dev liblzma-dev libsqlite3-dev unzip xz-utils
+            sudo bash "$repo/common/install_mise.sh";;
+        omarchy)
+            omarchy update
+            sudo pacman -S --needed base-devel openssl libyaml readline zlib libffi gmp pkgconf unzip xz;;
+    esac
+    exit 0
+fi
+command -v mise >/dev/null || fail 'mise missing: run machine native; reuse Omarchy mise.'
+version=$(mise --version); version=${version%% *}
+[[ $(printf '%s\n' 2026.11.0 "$version" | sort -t. -k1,1n -k2,2n -k3,3n | head -1) == 2026.11.0 ]] || fail 'mise >= 2026.11.0 required; update through its package owner.'
+activate() {
+    local target="${XDG_CONFIG_HOME:-$HOME/.config}/mise" backup file
+    if [[ -L $target && $(readlink "$target") == "$config" ]]; then
+        echo 'Configuration already linked; shell files unchanged.'; return
+    fi
+    backup="${XDG_STATE_HOME:-$HOME/.local/state}/mysettings/$(date +%Y%m%d-%H%M%S)-$$"
+    mkdir -p "$backup" "$(dirname "$target")"
+    for file in .zshrc .zprofile .bashrc .bash_profile .profile .npmrc; do
+        [[ ! -e $HOME/$file ]] || cp -pL "$HOME/$file" "$backup/$file"
+    done
+    [[ ! -e $target && ! -L $target ]] || mv "$target" "$backup/mise"
+    ln -s "$config" "$target"
+    echo "Configuration linked. Backup: $backup"
+    echo 'Shell files unchanged. Follow docs/mise.md to review and disable legacy initialization.'
+}
+case $operation in
+    setup|apply)
+        build_environment
+        m --locked install
+        # Only the machine Ruby gets this Bundler; project Rubies use their own lockfile.
+        bundler_version=$(cat "$config/bundler.version")
+        # Repair only when missing, not on every run.
+        if ! m exec -- gem list --installed bundler --version "$bundler_version" >/dev/null; then
+            m exec -- gem install bundler --version "$bundler_version" --no-document
+        fi
+        [[ $operation != setup ]] || activate
+        echo 'Declared tools checked; existing versions reused. No pruning or dependency updates.';;
+    lab)
+        build_environment
+        unset VIRTUAL_ENV
+        python_dir=$(m where python@3.13)
+        m exec -- uv sync --project "$repo/packages/lab-python" --locked --python "$python_dir/bin/python"
+        ;;
+    activate) activate;;
+    plan) m config; m --locked install --dry-run;;
+    sync)
+        [[ -z $(git -C "$repo" status --porcelain --untracked-files=normal) ]] || fail 'Working tree has changes. Commit/review before sync; nothing was stashed.'
+        git -C "$repo" pull --ff-only
+        exec "$repo/cli_tools/machine" apply;;
+    update-tools)
+        build_environment
+        [[ $# == 0 || ( $# == 1 && $1 == --dry-run ) ]] || fail 'Only update-tools --dry-run is supported.'
+        m upgrade --no-prune "$@"
+        if [[ ${1:-} == --dry-run ]]; then
+            echo 'Preview only; no versions or locks changed.'
+        else
+            echo 'Review and commit toolchain/*.lock. No application dependencies updated.'
+        fi;;
+    upgrade-versions)
+        [[ $# -gt 0 ]] || fail 'Name explicit tool@version policies, e.g. node@26; or edit toolchain/config*.toml and run machine lock.'
+        for request in "$@"; do
+            [[ $request == *@?* && $request != -* ]] || fail 'Every deliberate upgrade must name tool@version.'
+        done
+        build_environment
+        m upgrade --bump --no-prune "$@"
+        echo 'Review and commit the changed configuration and locks.';;
+    lock)
+        # Deliberate metadata refresh after editing tool declarations, never run by setup.
+        m lock --global;;
+    update-system)
+        build_environment
+        case $platform in
+            macos) brew update; brew upgrade; softwareupdate --list
+                echo 'Install Apple OS updates in System Settings; App Store apps through App Store/mas.';;
+            ubuntu) sudo apt-get update; sudo apt-get upgrade
+                echo 'Review held packages and /var/run/reboot-required; release upgrades are separate.';;
+            omarchy) omarchy update
+                echo 'Omarchy also updates mise tools: do not repeat update-tools in this cycle.';;
+        esac;;
+    doctor)
+        m --version; m config; m ls
+        echo 'Inherited command paths (all candidates):'
+        for tool in mise ruby bundle node pnpm corepack python uv flutter dart fvm rvm bun cargo; do type -a "$tool" 2>/dev/null || :; done
+        for name in GEM_HOME GEM_PATH BUNDLE_PATH PNPM_HOME UV_PYTHON VIRTUAL_ENV; do
+            [[ -z ${!name:-} ]] || echo "Review inherited $name (set)"
+        done
+        echo 'Machine-selected installed paths (does not install):'
+        for tool in ruby node pnpm python uv; do m which "$tool" || exit 1; done
+        build_environment
+        m --locked install --dry-run;;
+    cleanup)
+        echo 'PREVIEW ONLY: retain old runtimes until project/IDE/venv/service references are checked.'
+        m prune --dry-run
+        for item in "$HOME/.rvm" "$HOME/fvm" "$HOME/.bun" "$HOME/Library/pnpm" "$HOME/.local/share/pnpm" /home/linuxbrew/.linuxbrew; do
+            [[ ! -e $item ]] || printf 'Legacy candidate (not deleted): %s\n' "$item"
+        done;;
+    *) usage; exit 1;;
+esac

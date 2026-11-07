@@ -1,3 +1,6 @@
+> Tool installation/update ownership changed: see [mise migration](../docs/mise.md).
+> Historical installer descriptions below are superseded by that guide.
+
 # `packages/` — canonical package lists
 
 Single source of truth for what gets installed on each platform.

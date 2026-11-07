@@ -1,0 +1,8 @@
+# Copy into the application deployment checkout, not ~/.config/mise.
+[tools]
+ruby = "3.4.12"
+
+[settings]
+exec_auto_install = false
+not_found_auto_install = false
+upgrade.auto_prune = false

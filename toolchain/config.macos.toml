@@ -1,0 +1,16 @@
+# Native libraries and GUI applications remain Homebrew/Apple-owned.
+# Installed explicitly by machine native; no global compiler/linker flags.
+
+[bootstrap.packages]
+"brew:openssl@3" = "latest"
+"brew:readline" = "latest"
+"brew:libyaml" = "latest"
+"brew:gmp" = "latest"
+"brew:pkgconf" = "latest"
+"brew:eza" = "latest"
+
+# Omarchy already supplies these; only macOS needs mise copies.
+[tools]
+bat = "latest"
+fd = "latest"
+ripgrep = "latest"

@@ -1,104 +1,42 @@
 # mysettings
 
-mailab マシンのキッティングスクリプト。
-**注意:** このスクリプトを実行すると、taiyo の GitHub ED25519 鍵が `authorized_keys` に追加されます。
+Personal machine configuration for macOS workstations, Omarchy workstations and Ubuntu servers.
+Developer tools are declared in `toolchain/`; application dependencies stay in their projects.
+Codex and Claude are self-managed and excluded from repository installation, pinning, updates and cleanup.
 
-## エントリーポイント (新しい機械でこれを実行する)
-
-リポをクローンして、プラットフォームに合わせて **どちらか一つ** を実行:
-
-| プラットフォーム | コマンド |
-|------------------|----------|
-| **macOS**        | `./setup_mailab_mac.sh` |
-| **Ubuntu/Linux** | `./setup_mailab_ubuntu.sh` |
-
-その他のスクリプトは全て上記のオーケストレーターから呼ばれるサブスクリプトです — 直接実行する必要はありません。
-
-## ディレクトリ構成
-
-```
-mysettings/
-├── setup_mailab_mac.sh        ← Mac エントリーポイント
-├── setup_mailab_ubuntu.sh     ← Ubuntu エントリーポイント
-├── migrate_to_chezmoi.sh      ← 既存マシンを chezmoi 管理に移行 (opt-in)
-├── _zshrc, _p10k.zsh          ← レガシー配布用 (dotfiles/dot_zshrc.tmpl と同一内容を保つこと) — chezmoi 移行完了後に削除予定
-├── common/                    ← Mac / Linux 両方で使うスクリプト
-│   └── setup_zsh_and_keys.sh
-├── mac/                       ← Mac 専用サブスクリプト
-├── ubuntu/                    ← Ubuntu 専用サブスクリプト
-│   └── ubuntu_on_macbook.sh   ← MacBook ハードウェア上の Ubuntu 向け追加設定
-├── cli_tools/                 ← PATH に追加される運用ツール (login_check, llms_update, check_tools, …)
-├── dotfiles/                  ← chezmoi ソースディレクトリ (~/.zshrc 等のテンプレート)
-├── automated/                 ← Ansible playbook 版
-├── certs/                     ← mailab ルート CA 証明書
-└── multipass/                 ← Multipass VM 用 cloud-init bootstrap
+```sh
+# Select ONE profile in this checkout (untracked machine choice).
+./cli_tools/machine select macos-workstation
+# Alternatives: omarchy-workstation / ubuntu-server
+./cli_tools/machine native       # native prerequisites; explicit system changes
+./cli_tools/machine setup        # install locked tools, back up and link mise config
 ```
 
-## Mac のキッティング
+Existing machines: start with `machine plan` and follow the [migration and rollback guide](docs/mise.md)
+before switching shell initialization. Setup does not overwrite shell files, delete old tools,
+change SSH keys, deploy services or restart applications. Minimum mise: **2026.11.0**. Workstation artifacts currently target Apple Silicon Mac and x86_64 Linux;
+see the guide for other architecture limitations.
 
-最初に Homebrew を設定:
-[https://brew.sh]
+Normally run **`./cli_tools/machine sync`** to fast-forward a clean checkout and apply its locks.
+To advance personal tools within their declared policies, run **`./cli_tools/machine update-tools`**,
+review the lock changes and commit them. Projects inheriting defaults can be affected.
+On Omarchy, **`machine update-system`** already includes mise updates; do not run both update paths.
 
-```
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-```
+| Command | Changes |
+| --- | --- |
+| `machine plan` | Shows selected configuration and missing installations |
+| `machine apply` | Installs locked tools, no config linking or dependency updates |
+| `machine setup [profile]` | Apply, then back up/link `~/.config/mise` to this checkout |
+| `machine doctor` | Read-only paths, configuration and missing tools |
+| `machine update-system` | Homebrew / Ubuntu apt / complete Omarchy maintenance |
+| `machine upgrade-versions TOOL@VERSION` | Deliberately changes the named policy and its lock |
+| `machine cleanup` | Preview only; never deletes installations |
+| `machine lab` | Syncs the opt-in Python 3.13 lab environment from `packages/lab-python/uv.lock` |
 
-git コマンドがインストールされたので、このレポをクローン (ssh -A で主マシンからログインして実行すると便利):
+[Ownership, project migration, server execution, exceptions and verification](docs/mise.md)
 
-```
-git clone git@github.com:taiyodayo/mysettings.git
-```
-
-セットアップを実行 — terminal.app を推奨 (でないと ssh 接続が切れると停止する):
-
-```
-cd ~/mysettings
-./setup_mailab_mac.sh
-```
-
-Mac の 環境設定 - 共有 から Remote login 、画面共有を有効にしておくと便利:
-```
-open "x-apple.systempreferences:com.apple.settings.Sharing"
-```
-
-ここまでで、研究室の殆どの制作物はビルド出来るようになっているはずです。
-
-この後は下記のような設定:
-+ Xcode で AppleID にログイン
-+ Android Studio で commandline-tools をインストール
-+ flutter doctor で Android License 他を確認
-
-## Ubuntu のキッティング
-
-リポをクローン:
-```
-git clone git@github.com:taiyodayo/mysettings.git
-cd ~/mysettings
-```
-
-セットアップを実行 (一般ユーザで起動。途中で `sudo` パスワードが聞かれます):
-
-```
-./setup_mailab_ubuntu.sh
-```
-
-完了後、ログアウト/ログインして新しい shell config と docker グループを反映させてください。
-
-MacBook ハードウェア上で Ubuntu を動かしている場合は、追加で:
-```
-sudo ./ubuntu/ubuntu_on_macbook.sh
-```
-
-## chezmoi 移行 (進行中)
-
-`~/.zshrc` / `~/.gitconfig` / `~/.p10k.zsh` 等を chezmoi で管理する移行を進めています。既存のキット済みマシンを移行するには:
-
-```
-./migrate_to_chezmoi.sh
-```
-
-詳細は `dotfiles/README.md` を参照。
-
-## Ansible 版
-
-`automated/` 配下に同等の Ansible playbook 一式があります。リモート fleet 向け。詳細は `automated/README.md`。
+`setup_mailab_mac.sh` and `setup_mailab_ubuntu.sh` now alias tool setup. Broad lab provisioning
+(R, Docker, GUI applications, SSH keys, system preferences) remains opt-in in `mac/`, `ubuntu/`
+and `automated/`; it is not ordinary tool maintenance. Review these older recipes before running:
+some intentionally change services, package sources and user access. No Omarchy machine should
+run an Ubuntu recipe. The existing chezmoi source is `dotfiles/`; `_zshrc` mirrors its zsh template.

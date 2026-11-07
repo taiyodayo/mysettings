@@ -1,0 +1,8 @@
+# Per-checkout machine selection and overrides (never shared).
+/toolchain/miserc.local.toml
+/toolchain/config.local.toml
+/toolchain/config.*.local.toml
+/toolchain/mise.local.lock
+/toolchain/mise.*.local.lock
+
+/packages/lab-python/.venv/
