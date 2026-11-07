@@ -53,3 +53,7 @@ Replace `alice` and the address; omit `-K` for passwordless sudo. Requires works
 The launcher bootstraps missing Python, deploys this checkout's committed revision, installs
 native prerequisites/mise/tools, and adds a backed-up shell activation block. Re-run the same
 command to apply a newer published commit. [Remote setup and scope](automated/README.md#remote-ubuntu-from-your-workstation).
+
+For the preceding USB installation step, use the [Ubuntu Server 26.04 minimal
+autoinstall template](ubuntu/autoinstall/README.md). It installs SSH, your public key,
+Avahi and Ansible prerequisites while keeping disk and account selection interactive.
