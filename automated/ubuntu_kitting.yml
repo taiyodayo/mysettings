@@ -525,7 +525,7 @@
               }
 
         - name: Verify R install (bspm + preloaded packages)
-          ansible.builtin.command: "{{ mysettings_repo_dir }}/cli_tools/check_r.sh"
+          ansible.builtin.command: "{{ mysettings_remote_dir | default(mysettings_repo_dir) }}/cli_tools/check_r.sh"
           register: r_check
           changed_when: false
           failed_when: false
@@ -569,7 +569,7 @@
     # to "root" when gather_facts runs with become: true. lookup('env', …)
     # evaluates on the controller in the invoker's context, ignoring become.
     target_user: "{{ lookup('env', 'SUDO_USER') | default(lookup('env', 'USER'), true) }}"
-    user_home: "/home/{{ target_user }}"
+    user_home: "{{ remote_user_home | default('/home/' + target_user) }}"
     # Repo root — needed by the user layer to invoke dotfiles/ scripts.
     # Mirrors the system-layer vars block; redefined here because Ansible
     # play-level vars don't cross plays.
@@ -602,7 +602,7 @@
     - name: Apply declared server tools
       become_user: "{{ target_user }}"
       ansible.builtin.command:
-        argv: ["{{ mysettings_repo_dir }}/cli_tools/machine", setup, ubuntu-server]
+        argv: ["{{ mysettings_remote_dir | default(mysettings_repo_dir) }}/cli_tools/machine", setup, ubuntu-server]
       environment:
         HOME: "{{ user_home }}"
         PATH: "/usr/local/bin:/usr/bin:/bin"
@@ -620,7 +620,7 @@
 
     - name: Run login_check.sh (gh / claude / codex auth status)
       become_user: "{{ target_user }}"
-      ansible.builtin.command: "{{ user_home }}/mysettings/cli_tools/login_check.sh"
+      ansible.builtin.command: "{{ mysettings_remote_dir | default(user_home + '/mysettings') }}/cli_tools/login_check.sh"
       register: login_check
       changed_when: false
       failed_when: false
@@ -633,7 +633,7 @@
 
     - name: Run check_tools.sh (canonical-install audit)
       become_user: "{{ target_user }}"
-      ansible.builtin.command: "{{ user_home }}/mysettings/cli_tools/check_tools.sh"
+      ansible.builtin.command: "{{ mysettings_remote_dir | default(user_home + '/mysettings') }}/cli_tools/check_tools.sh"
       register: check_tools
       changed_when: false
       failed_when: false

@@ -40,3 +40,16 @@ On Omarchy, **`machine update-system`** already includes mise updates; do not ru
 and `automated/`; it is not ordinary tool maintenance. Review these older recipes before running:
 some intentionally change services, package sources and user access. No Omarchy machine should
 run an Ubuntu recipe. The existing chezmoi source is `dotfiles/`; `_zshrc` mirrors its zsh template.
+
+From your workstation, kit a minimal Ubuntu server with an existing SSH account and sudo access:
+
+```sh
+ssh alice@192.168.1.50                 # verify the host key once
+./kit-server alice@192.168.1.50 -K --check  # read-only Ubuntu/SSH/sudo preflight
+./kit-server alice@192.168.1.50 -K          # install the locked Ubuntu server setup
+```
+
+Replace `alice` and the address; omit `-K` for passwordless sudo. Requires workstation Ansible.
+The launcher bootstraps missing Python, deploys this checkout's committed revision, installs
+native prerequisites/mise/tools, and adds a backed-up shell activation block. Re-run the same
+command to apply a newer published commit. [Remote setup and scope](automated/README.md#remote-ubuntu-from-your-workstation).

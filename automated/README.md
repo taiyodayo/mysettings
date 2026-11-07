@@ -85,18 +85,67 @@ make audit                     # pre-reboot safety audit (Ubuntu)
 make kit EXTRA='--check --diff'
 ```
 
-## Running against a remote fleet
+## Remote Ubuntu from your workstation
 
-Edit `inventory.yml` to add hostnames (the file has a commented example),
-then call `ansible-playbook` directly:
+For a USB-installed **Ubuntu 22.04+** machine, prepare an existing non-root account,
+sshd and your public key during installation. That account must have sudo privileges.
+No Ansible or Python installation is required on the target before starting.
+Keep Ansible on the workstation under its existing installation owner (on macOS:
+`brew install ansible`). The baseline uses only built-in Ansible modules.
 
-```bash
-ansible-playbook ubuntu_kitting.yml
+Run from the repository root:
+
+```sh
+ssh alice@192.168.1.50                       # verify the host fingerprint once
+./kit-server alice@192.168.1.50 -K --check    # read-only SSH/Ubuntu/sudo preflight
+./kit-server alice@192.168.1.50 -K            # apply
 ```
 
-`mysettings_repo_dir` defaults to the parent of the playbook directory,
-so the controller's local copy of this repo is what gets pushed to the
-targets (for `_zshrc`, `certs/*.crt`, etc.).
+Replace the username/address with your known SSH account and host. `-K` prompts for
+its sudo password; omit it for passwordless sudo. SSH aliases/agent configuration
+are honored. Use `--port 2222` or `--identity ~/.ssh/server_key` when needed.
+Host-key checking remains enabled; the launcher never edits the localhost inventory.
+
+The default kit installs missing distribution Python, native build prerequisites,
+and apt-owned mise. It checks out the selected commit into the SSH user's
+`~/mysettings`, applies the locked `ubuntu-server` profile as that user, and links
+mise configuration back to that checkout. It backs up an existing shell rc before
+adding one activation block (bash or zsh), and verifies runtime commands explicitly.
+It does not change SSH keys, firewall rules, application services or reboot.
+Internet access to Ubuntu package sources, GitHub and tool download hosts is required.
+
+`--check` is deliberately **preflight only**, even with `--lab`: it checks the OS,
+login and sudo without installing Python or downloading tools. It is not a full
+simulation of package/runtime changes. Applying repeatedly reuses installed tools
+and refuses dirty checkouts, history rewinds and divergent histories.
+
+By default the target receives the workstation's **committed HEAD**, resolved to an
+exact SHA. Publish that commit to origin first; uncommitted edits are not deployed.
+`--ref main` or `--ref COMMIT` selects a different locally known, published revision.
+The controller executes its local playbooks, so use a reviewed checkout there too.
+The remote tracking branch supports the usual `cli_tools/machine sync`; alternatively
+rerun `kit-server` from your updated workstation checkout. Locks are not advanced by
+kitting. Application deployment, pinned service runtimes and restarts remain separate.
+Existing machines should follow [migration/rollback](../docs/mise.md) first; retain
+old runtime installations and review legacy shell initialization before using this kit.
+
+For the broader existing lab recipe, explicitly opt in:
+
+```sh
+ansible-galaxy collection install -r automated/requirements.yml
+./kit-server alice@192.168.1.50 -K --lab
+```
+
+Review `ubuntu_kitting.yml` first: this also upgrades apt packages, changes system
+settings and certificate trust, installs R/r2u and Docker, and starts/restarts services
+including Docker/monitoring. It is not necessary for the minimal server tool setup.
+Remote execution paths are resolved on the target; local copy sources remain in the
+controller checkout. Codex and Claude remain self-managed.
+
+Verification: shell syntax/ShellCheck, both playbook syntax checks and stubbed launcher
+argument/inventory checks on macOS. Actual SSH bootstrap, Ubuntu package installation,
+second-run idempotence and the optional lab recipe still require a disposable Ubuntu
+host; no remote target was supplied or contacted.
 
 ## Variables you'll override
 

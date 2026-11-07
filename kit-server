@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# Workstation entry point. Remote commands and data are passed separately.
+set -euo pipefail
+repo=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+usage() {
+    cat <<'HELP'
+Usage: ./kit-server USER@HOST [-K] [--port PORT] [--identity FILE] [--ref REF] [--check] [--lab]
+
+USER is the existing non-root Ubuntu SSH account with sudo privileges.
+HOST may be an IP address, DNS name or ~/.ssh/config alias.
+  -K, --ask-become-pass  Prompt for the remote sudo password (never stored).
+  --port PORT           Override SSH port (otherwise honor SSH configuration).
+  --identity FILE       SSH private key (otherwise use SSH configuration/agent).
+  --ref REF             Local Git ref/commit to deploy; default HEAD, resolved to a SHA.
+  --check               Read-only remote preflight (including on Python-less hosts).
+  --lab                 Also run the broader Docker/R/monitoring/system kit.
+
+Requires ansible-playbook on the workstation. No Ansible installation on the server.
+First connect with ssh USER@HOST to verify its host key. SSH keys/auth settings are unchanged.
+Only committed code is deployed. Dirty remote checkouts and non-fast-forward updates are refused.
+HELP
+}
+fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+if [[ ${1:-} == --help || ${1:-} == -h ]]; then usage; exit 0; fi
+[[ $# -ge 1 ]] || { usage >&2; exit 1; }
+destination=$1; shift
+[[ $destination == *@* ]] || fail 'Use explicit USER@HOST.'
+remote_user=${destination%%@*}; remote_host=${destination#*@}
+[[ $remote_user =~ ^[a-z_][a-zA-Z0-9_-]*$ && $remote_user != root ]] || fail 'Use an existing non-root SSH user with sudo.'
+[[ $remote_host =~ ^[a-zA-Z0-9][a-zA-Z0-9.:-]*$ ]] || fail 'Use a hostname, SSH alias or unbracketed IP address.'
+ref=HEAD; port=''; playbook=remote_ubuntu.yml; preflight=false
+args=()
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -K|--ask-become-pass) args+=(--ask-become-pass); shift;;
+        --check) args+=(--check); preflight=true; shift;;
+        --lab) playbook=remote_ubuntu_lab.yml; shift;;
+        --port) [[ $# -ge 2 ]] || fail '--port requires a value'; port=$2; shift 2;;
+        --identity) [[ $# -ge 2 && -f $2 ]] || fail '--identity requires an existing file'; args+=(--private-key "$2"); shift 2;;
+        --ref) [[ $# -ge 2 && $2 != -* ]] || fail '--ref requires a Git ref'; ref=$2; shift 2;;
+        *) fail "Unknown option: $1";;
+    esac
+done
+if [[ -n $port ]]; then
+    [[ $port =~ ^[0-9]{1,5}$ ]] || fail 'Invalid SSH port.'
+    port=$((10#$port))
+    [[ $port -ge 1 && $port -le 65535 ]] || fail 'Invalid SSH port.'
+fi
+# --check never enters the broader lab playbook, even if --lab was requested.
+if $preflight; then playbook=remote_ubuntu.yml; fi
+command -v ansible-playbook >/dev/null || fail 'Install workstation Ansible first (macOS: brew install ansible; see automated/README.md).'
+revision=$(git -C "$repo" rev-parse --verify "$ref^{commit}")
+[[ -z $(git -C "$repo" status --porcelain --untracked-files=no) ]] || printf '%s\n' 'NOTE: local uncommitted edits are not deployed; the server receives the selected commit.' >&2
+inventory=$(mktemp)
+trap 'rm -f "$inventory"' EXIT
+chmod 600 "$inventory"
+{
+    printf '[servers]\ntarget ansible_host=%s ansible_user=%s ansible_connection=ssh ansible_python_interpreter=/usr/bin/python3\n' "$remote_host" "$remote_user"
+} > "$inventory"
+[[ -z $port ]] || args+=(-e "ansible_port=$port")
+# Override the legacy local kit's disabled host-key checking and never inherit its inventory.
+export ANSIBLE_CONFIG="$repo/automated/ansible.cfg" ANSIBLE_HOST_KEY_CHECKING=True
+printf 'Target: %s | commit: %s | playbook: %s\n' "$destination" "$revision" "$playbook"
+ansible-playbook -i "$inventory" "$repo/automated/$playbook" \
+    -e "target_user=$remote_user" -e "server_revision=$revision" "${args[@]}"
