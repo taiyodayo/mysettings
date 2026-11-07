@@ -1,20 +1,2 @@
-# Python packages preloaded into ~/p313 (uv-managed CPython 3.13 venv)
-# so a fresh shell has the lab's data-science kit ready.
-#
-# Polars-first per CLAUDE.md — listed first deliberately. Pandas stays
-# because legacy notebooks and some scikit-learn ecosystem bits still
-# expect it.
-#
-# Read by:
-#   - common/install_uv_and_p313.sh  (bash → awk → xargs uv pip install)
-#     — invoked by both the Mac kit (mac/setup_cli_tools.sh) and the
-#     Ubuntu kits (ubuntu/my_ubuntu_setup.sh + automated/ubuntu_kitting.yml)
-#     so the lab DS preload is identical on every kitted box.
-
-- polars
-- pandas
-- numpy
-- requests
-- pyarrow
-- scikit-learn
-- jupyter
+# Retired: dependencies and uv.lock now live in lab-python/.
+[]

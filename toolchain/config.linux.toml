@@ -1,0 +1,2 @@
+# Native build packages come from apt or Omarchy, never Linuxbrew.
+# machine checks inherited build environment before installing/updating.

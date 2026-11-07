@@ -56,7 +56,7 @@ fi
 # (gnucp, gnutr, gnudate, gnusha256sum, ...) if a script trips on a
 # uutils flag difference. rustup is orthogonal to all of this and is
 # what you actually want for Rust development work.
-apt-get purge -y rustc cargo 2>/dev/null || true
+# OS-owned rustc/cargo are retained; mise selection controls developer tools.
 
 # mise — install via the shared common script. Ubuntu uses the official
 # mise.jdx.dev apt repo (so apt-get upgrade keeps it current); Mac uses
@@ -80,7 +80,7 @@ apt-get update && apt-get install -y gh
 # Dart SDK — install via the shared common script. Ubuntu uses Google's
 # official apt repo (autoupdates via apt-get upgrade); Mac uses brew.
 # fvm sits on top of this in the userland block below.
-bash "$SCRIPT_DIR/common/install_dart.sh"
+# Dart comes from workstation Flutter, never from an apt SDK.
 
 # タイムゾーンを東京に設定
 timedatectl set-timezone Asia/Tokyo
@@ -315,92 +315,15 @@ apt-get install -y ghostscript qpdf mupdf imagemagick
 ### ここからユーザランド ###
 # here-document としてコマンドを列記
 sudo -u "$SUDO_USER" zsh << 'EOF'
+set -e
 echo "Running as $SUDO_USER"
 
 # Repo path inside the user heredoc — relies on the project convention that
 # the repo lives at ~/mysettings (enforced by setup_mailab_ubuntu-ansible.sh).
 MYSETTINGS_DIR="$HOME/mysettings"
 
-# Homebrew on Linux is DEPRECATED.
-#
-# Why: apt + curl-pipe-sh covers everything we need (gh, mise, bat, eza,
-# rustup, uv, claude-native, bun). linuxbrew creates a parallel package
-# universe at /home/linuxbrew/ that:
-#   - Duplicates things apt has (gh, mise, uv) and shadows our canonical
-#     installs via PATH ordering — caught by cli_tools/check_tools.sh
-#   - Pulls in its own libgcc/glibc shims that occasionally conflict
-#     with system tooling
-#   - Adds ~500 MB on disk + slow upgrade cycle vs apt's fast binary debs
-#
-# Mac brew is unchanged — it's the canonical Mac package manager.
-# Existing linuxbrew installs on this fleet are NOT auto-removed — kitting
-# detects them and prints the uninstall command. Run cli_tools/check_tools.sh
-# anytime to see the warning + recommended action.
-if [ -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
-    echo ""
-    echo "*** linuxbrew is deprecated ***"
-    echo "  /home/linuxbrew/.linuxbrew/bin/brew detected. We no longer install"
-    echo "  linuxbrew during kitting. To remove it (recommended):"
-    echo "    /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/uninstall.sh)\""
-    echo "  Existing installs still work (~/.zshrc still sources brew shellenv"
-    echo "  if found), but tools should migrate to apt / curl-pipe-sh."
-    echo ""
-fi
-
-# mise activate hook in ~/.zshrc (mise binary installed by the root block
-# above via common/install_mise.sh). chezmoi's dot_zshrc.tmpl already
-# handles this for chezmoi-managed shells; the inline append below keeps
-# pre-chezmoi machines working.
-eval "$(mise activate zsh)"
-if [ ! -f ~/.zshrc ] || ! grep -Fq 'mise activate zsh' ~/.zshrc; then
-  cat >> ~/.zshrc <<-'EOM'
-# mise
-eval "$(mise activate zsh)"
-EOM
-fi
-
-# node@lts via mise — shared with the Mac kit.
-bash "$MYSETTINGS_DIR/common/install_node.sh"
-
-# uv + ~/p313 venv + lab DS preload — shared with the Mac kit. The
-# common script delegates uv install to dotfiles/run_onchange_install-uv.sh
-# (astral.sh's curl installer on Linux), then creates the cpython-3.13
-# venv at ~/p313 and preloads polars, pandas, numpy, etc. per
-# packages/lab_python.yml. dot_zshrc.tmpl sources the venv's activate
-# on every shell; the imperative ~/.zshrc append below keeps
-# pre-chezmoi machines working.
-bash "$MYSETTINGS_DIR/common/install_uv_and_p313.sh"
-# Installer adds ~/.local/bin to ~/.zshrc but not this shell; activate.
-export PATH="$HOME/.local/bin:$PATH"
-if [ ! -f ~/.zshrc ] || ! grep -Fq 'p313/bin/activate' ~/.zshrc; then
-    echo 'source ~/p313/bin/activate' >> ~/.zshrc
-fi
-
-# bun — shared with the Mac kit. cli_tools/llms_update.sh uses `bun add -g`
-# for codex, so bun must be on PATH before that runs.
-bash "$MYSETTINGS_DIR/common/install_bun.sh"
-# Activate for this session (installer adds ~/.bun/bin to .zshrc, but not
-# the current shell). dot_zshrc.tmpl picks it up via `[ -d "$HOME/.bun" ]`.
-[ -d "$HOME/.bun" ] && export PATH="$HOME/.bun/bin:$PATH"
-
-# rustup + the cargo CLI route — shared with the Mac kit. Single script
-# installs rustup (or self-updates), cargo-binstall, and the 10-tool
-# inventory (bat eza rg fd delta dust git-trim jless zellij qsv). System
-# rustc/cargo (apt) were purged in the root section above so they can't
-# shadow ~/.cargo/bin. The script writes ~/.cargo/env which the rustup
-# installer appends to ~/.zshrc for future shells.
-bash "$MYSETTINGS_DIR/dotfiles/run_onchange_install-rustup-and-cargo-tools.sh"
-# Source cargo env so the rest of THIS heredoc (and check_tools.sh below)
-# can resolve ~/.cargo/bin without waiting for a re-login.
-# shellcheck source=/dev/null
-[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
-
-# fvm + Flutter — shared with the Mac kit. Skip if dart didn't install
-# (root-block install_dart.sh would have failed; common script gates on
-# command -v dart). dot_zshrc.tmpl picks up ~/.pub-cache/bin long-term.
-if command -v dart >/dev/null 2>&1; then
-    bash "$MYSETTINGS_DIR/common/install_fvm_flutter.sh"
-fi
+# Explicit server role; no workstation SDKs or ambient virtual environment.
+"$MYSETTINGS_DIR/cli_tools/machine" setup ubuntu-server
 
 # git global defaults — shared with the Mac kit.
 bash "$MYSETTINGS_DIR/common/git_defaults.sh"

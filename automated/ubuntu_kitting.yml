@@ -118,17 +118,6 @@
         msg: "WARNING: yq snap install failed — continuing without yq. Install manually later: snap install yq"
       when: snap_yq.failed | default(false)
 
-    # Purge apt rustc/cargo BEFORE the per-user rustup install in the user
-    # block — otherwise apt's rustc/cargo (under /usr/bin) can shadow
-    # ~/.cargo/bin depending on rc ordering. Idempotent — succeeds even when
-    # the packages aren't installed. (Ubuntu 26.04+ ships uutils + sudo-rs
-    # as system binaries; those aren't dev toolchains and are left alone.)
-    - name: Purge apt rustc/cargo (rustup installs per-user toolchain later)
-      ansible.builtin.apt:
-        name: [rustc, cargo]
-        state: absent
-        purge: true
-
     - name: Set timezone to Asia/Tokyo
       community.general.timezone:
         name: Asia/Tokyo
@@ -172,8 +161,6 @@
     # ---- Dart SDK — shared with the Mac kit via tasks/common_dart.yml ----
     # Needed for Flutter Version Manager (fvm) in the userland block below.
 
-    - name: Include common_dart tasks
-      ansible.builtin.include_tasks: tasks/common_dart.yml
 
     # ---- docker (docker-ce from Docker Inc, not docker.io) ----
     # Ubuntu's docker.io lags several major versions by mid-LTS cycle.
@@ -612,103 +599,15 @@
           as your normal user (`cd automated && make kit --ask-become-pass`)
           or pass `-e target_user=<name>` explicitly.
 
-    # linuxbrew is DEPRECATED on Linux. apt + curl-pipe-sh covers everything
-    # (gh, mise, bat, eza, rustup, uv, claude-native, bun). Linuxbrew creates
-    # a parallel package universe at /home/linuxbrew/ that shadows our
-    # canonical installs via PATH ordering — caught by check_tools.sh. We
-    # detect existing installs and print the uninstall command; never auto-
-    # remove (the user may have local state they care about).
-    - name: Detect deprecated linuxbrew install
-      ansible.builtin.stat:
-        path: /home/linuxbrew/.linuxbrew/bin/brew
-      register: linuxbrew_stat
-
-    - name: Warn about deprecated linuxbrew
-      ansible.builtin.debug:
-        msg: |
-          *** linuxbrew is deprecated ***
-          /home/linuxbrew/.linuxbrew/bin/brew detected. We no longer install
-          linuxbrew during kitting (apt + curl-pipe-sh covers our tools).
-          To remove (recommended):
-            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/uninstall.sh)"
-          Existing installs still work but tools should migrate to
-          apt / curl-pipe-sh. Run cli_tools/check_tools.sh anytime to see
-          the warning + recommended action.
-      when: linuxbrew_stat.stat.exists
-
-    - name: Activate mise + p313 + add cli_tools / ~/.local/bin to PATH in ~/.zshrc
+    - name: Apply declared server tools
       become_user: "{{ target_user }}"
-      ansible.builtin.blockinfile:
-        path: "{{ user_home }}/.zshrc"
-        create: true
-        mode: "0644"
-        marker: "# {mark} ANSIBLE MANAGED BLOCK - mise + PATH"
-        block: |
-          eval "$(mise activate zsh)"
-          export PATH="$HOME/mysettings/cli_tools:$PATH"
-          export PATH="$HOME/.local/bin:$PATH"
-          [ -f "$HOME/p313/bin/activate" ] && source "$HOME/p313/bin/activate"
-
-    # node@lts via mise — shared with the Mac kit via tasks/common_node.yml.
-    - name: Include common_node tasks
-      ansible.builtin.include_tasks: tasks/common_node.yml
-
-    # uv + ~/p313 venv + lab DS preload — shared with the Mac kit via
-    # common/install_uv_and_p313.sh. The script delegates uv install to
-    # dotfiles/run_onchange_install-uv.sh (astral.sh's curl installer on
-    # Linux), then creates the cpython-3.13 venv at ~/p313 and preloads
-    # polars/pandas/numpy/etc. per packages/lab_python.yml.
-    - name: Install uv + p313 venv + lab DS preload
-      become_user: "{{ target_user }}"
-      ansible.builtin.command: bash {{ mysettings_repo_dir }}/common/install_uv_and_p313.sh
+      ansible.builtin.command:
+        argv: ["{{ mysettings_repo_dir }}/cli_tools/machine", setup, ubuntu-server]
       environment:
-        # ~/.local/bin first so an existing uv install is found before the
-        # curl installer fires; common-script does an explicit re-export
-        # but Ansible's command module doesn't inherit it from there.
-        PATH: "{{ user_home }}/.local/bin:{{ user_home }}/.cargo/bin:/usr/local/bin:/usr/bin:/bin"
-      register: uv_p313
-      changed_when: "'Installed' in (uv_p313.stdout | default('')) or 'Creating virtual environment' in (uv_p313.stdout | default(''))"
-      # Tolerant: a transient PyPI hiccup on `uv pip install` shouldn't
-      # sink the rest of the kit — the operator can re-run later.
-      ignore_errors: true
-
-    - name: Warn if uv + p313 install reported failures
-      ansible.builtin.debug:
-        msg: "WARNING: uv/p313 script exited non-zero — check tail of {{ uv_p313.stdout_lines | default([]) | join(' / ') }} and re-run kit or `bash common/install_uv_and_p313.sh` later."
-      when: uv_p313.failed | default(false)
-
-    # bun — shared with the Mac kit via tasks/common_bun.yml. cli_tools/llms_update.sh
-    # uses `bun add -g` for codex, so bun must be on PATH before that.
-    - name: Include common_bun tasks
-      ansible.builtin.include_tasks: tasks/common_bun.yml
-
-    # rustup + cargo-binstall + 10 cargo CLIs (bat eza rg fd delta dust
-    # git-trim jless zellij qsv) — shared with the Mac kit. Single script
-    # installs rustup (or self-updates), cargo-binstall, and the full tool
-    # inventory. apt rustc/cargo were purged in the system block so they
-    # can't shadow ~/.cargo/bin. The script is per-tool tolerant — a flaky
-    # download / OOM on one crate doesn't sink the rest.
-    - name: Install rustup + cargo tools via dotfiles script
-      become_user: "{{ target_user }}"
-      ansible.builtin.command: bash {{ mysettings_repo_dir }}/dotfiles/run_onchange_install-rustup-and-cargo-tools.sh
-      environment:
-        # rustup curl-pipe-sh installer; cargo binstall fetches via curl.
-        # ~/.cargo/bin first so re-runs find rustup/cargo from the prior install.
-        PATH: "{{ user_home }}/.cargo/bin:{{ user_home }}/.local/bin:/usr/local/bin:/usr/bin:/bin"
-      register: cargo_tools
-      changed_when: "'Installing' in (cargo_tools.stdout | default('')) or 'updated' in (cargo_tools.stdout | default(''))"
-      # Tolerant: the script is internally tolerant per-tool, but the
-      # outer install (rustup self-update on a stale system) can blip.
-      ignore_errors: true
-
-    - name: Warn if cargo tools install reported failures
-      ansible.builtin.debug:
-        msg: "WARNING: cargo tools script exited non-zero — check {{ cargo_tools.stdout_lines | default([]) | join(' / ') }} and re-run kit or `bash dotfiles/run_onchange_install-rustup-and-cargo-tools.sh` later."
-      when: cargo_tools.failed | default(false)
-
-    # fvm + Flutter — shared with the Mac kit via tasks/common_fvm.yml.
-    - name: Include common_fvm tasks
-      ansible.builtin.include_tasks: tasks/common_fvm.yml
+        HOME: "{{ user_home }}"
+        PATH: "/usr/local/bin:/usr/bin:/bin"
+      register: machine_setup
+      changed_when: "'installed' in machine_setup.stderr or 'Configuration linked' in machine_setup.stdout"
 
     # Git global config — shared with the Mac kit via tasks/common_git.yml.
     - name: Include common_git tasks

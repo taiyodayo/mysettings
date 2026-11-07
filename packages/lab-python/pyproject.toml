@@ -1,0 +1,8 @@
+[project]
+name = "mailab-notebooks"
+version = "0.0.0"
+requires-python = ">=3.13,<3.14"
+dependencies = ["polars", "pandas", "numpy", "requests", "pyarrow", "scikit-learn", "jupyter"]
+
+[tool.uv]
+package = false

@@ -1,3 +1,6 @@
+> Tool installation/update ownership changed: see [mise migration](../docs/mise.md).
+> Historical installer descriptions below are superseded by that guide.
+
 # automated/ — declarative kitting (cross-platform)
 
 Ansible reimplementation of the shell kit scripts in this repo. The
@@ -72,7 +75,7 @@ make kit                       # Ubuntu-only kitting (back-compat alias)
 make mac-kit                   # Mac-only kitting
 make motd                      # strip motd ads (Ubuntu)
 make zsh GH=taiyodayo          # zsh + import GitHub ed25519 key (Ubuntu)
-make llms                      # update claude / codex
+make llms                      # self-managed agent notice; no updates
 make audit                     # pre-reboot safety audit (Ubuntu)
 ```
 
@@ -110,9 +113,8 @@ declarative module for them and rewriting inline would lose upstream
 updates:
 
 - **IMEI installer** — builds ImageMagick 7 against pinned ghostscript.
-- **claude native installer** (`install.sh | bash`).
-- **claude shim purge** — walking `~/.bun/bin`, `~/.volta/tools/image/node/*`,
-  uninstalling via each node's npm. One commented shell block.
+Codex and Claude installation, versions, updates and cleanup are intentionally unmanaged by this repository.
+The historical `llms` entry point only prints that ownership policy.
 
 ## Things intentionally NOT automated
 

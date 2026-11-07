@@ -23,23 +23,18 @@
 # -- build / dev tooling --
 - automake
 - awscli
-- cocoapods
 - dockutil
 - gh
 - git
 - git-lfs
-- google-cloud-sdk
 - mas
-- ruby
 - shellcheck
 - subversion
 
 # -- runtime / language managers --
 # bun + mise moved to common/install_bun.sh + install_mise.sh (Phase 3),
 # so the install path is shared with the Ubuntu kit.
-# uv stays here for now; Phase 5 will lift it into common/install_uv.sh
-# alongside the ~/p313 venv + lab_python.yml preload.
-- uv
+# Runtime/tool declarations live in toolchain/config*.toml.
 
 # -- GNU userland (Mac ships BSD; we want GNU on PATH) --
 - bash
@@ -86,3 +81,6 @@
 - tealdeer
 - yq
 - zoxide
+
+# Native exception: registry plugin incompatible with our minimum mise.
+- eza

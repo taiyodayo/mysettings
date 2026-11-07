@@ -1,3 +1,6 @@
+> Tool installation/update ownership changed: see [mise migration](../docs/mise.md).
+> Historical installer descriptions below are superseded by that guide.
+
 # dotfiles/ — chezmoi source directory
 
 This directory is the [chezmoi](https://chezmoi.io) source for files that land in `~/`. Today (post-PR 1, pre-PR 4) it is **opt-in**: existing kitted machines keep using `_zshrc` + the imperative appends in the kitting scripts. Run `../migrate_to_chezmoi.sh` on a machine to switch it over.

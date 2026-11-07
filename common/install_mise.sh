@@ -14,6 +14,11 @@
 
 set -euo pipefail
 
+# Reuse the existing installation; its package manager remains the owner.
+if command -v mise >/dev/null 2>&1; then
+    mise --version
+    exit 0
+fi
 case "$(uname -s)" in
     Darwin)
         if [[ $EUID -eq 0 ]]; then
@@ -24,6 +29,10 @@ case "$(uname -s)" in
         brew install mise
         ;;
     Linux)
+        # Omarchy supplies mise. Never install a second copy via apt/curl.
+        # shellcheck disable=SC1091
+        . /etc/os-release
+        [[ $ID == ubuntu ]] || { echo 'Use the distribution-owned mise installation.' >&2; exit 1; }
         if [[ $EUID -ne 0 ]]; then
             echo "ERROR: install_mise.sh on Linux must run as root (apt-repo setup)." >&2
             exit 1

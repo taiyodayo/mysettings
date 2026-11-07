@@ -1,0 +1,2 @@
+# These are administrator defaults, NOT service runtimes.
+# Services pin tools in their own deployment directory; see docs/mise.md.

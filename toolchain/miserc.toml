@@ -1,0 +1,2 @@
+# Select every dimension explicitly; no implicit Linux workstation.
+auto_env = false
