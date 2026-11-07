@@ -1,0 +1,23 @@
+# Ubuntu Server 26.04 LTS installation-media template.
+# Replace the public key before copying to USB; never put a private key here.
+# Select Ubuntu Server (minimized) in the interactive source screen.
+autoinstall:
+  version: 1
+  interactive-sections:
+    - source
+    - storage
+    - network
+    - identity
+  ssh:
+    install-server: true
+    allow-pw: false
+    authorized-keys:
+      - "ssh-ed25519 REPLACE_WITH_YOUR_PUBLIC_KEY"
+  packages:
+    - avahi-daemon
+    - sudo
+    - python3
+    - python3-apt
+    - ca-certificates
+  late-commands:
+    - curtin in-target -- systemctl enable avahi-daemon
